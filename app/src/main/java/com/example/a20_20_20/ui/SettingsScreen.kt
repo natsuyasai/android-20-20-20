@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.a20_20_20.domain.NotificationSettings
+import com.example.a20_20_20.domain.NotificationPriority
 import com.example.a20_20_20.domain.SoundPlaybackMode
 import com.example.a20_20_20.domain.TimerSettings
 
@@ -57,6 +58,7 @@ fun SettingsScreen(
     var workCompleteSound by remember { mutableStateOf(currentNotificationSettings.workCompleteSound) }
     var breakCompleteSound by remember { mutableStateOf(currentNotificationSettings.breakCompleteSound) }
     var soundPlaybackMode by remember { mutableStateOf(currentNotificationSettings.soundPlaybackMode) }
+    var notificationPriority by remember { mutableStateOf(currentNotificationSettings.priority) }
     
     val context = LocalContext.current
     
@@ -244,6 +246,28 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 
+                // 通知優先度設定
+                Text("通知の優先度")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = notificationPriority == NotificationPriority.SILENT,
+                        onClick = { notificationPriority = NotificationPriority.SILENT },
+                        label = { Text("サイレント") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = notificationPriority == NotificationPriority.DEFAULT,
+                        onClick = { notificationPriority = NotificationPriority.DEFAULT },
+                        label = { Text("デフォルト") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
                 // サウンド有効/無効
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -357,7 +381,8 @@ fun SettingsScreen(
                     enableSound = enableSound,
                     enableVibration = enableVibration,
                     soundVolume = soundVolume,
-                    soundPlaybackMode = soundPlaybackMode
+                    soundPlaybackMode = soundPlaybackMode,
+                    priority = notificationPriority
                 )
                 onSettingsChanged(newSettings)
                 onNotificationSettingsChanged(newNotificationSettings)

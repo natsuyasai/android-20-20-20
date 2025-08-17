@@ -9,6 +9,8 @@ data class TimerSettings(
         const val DEFAULT_WORK_DURATION_MILLIS = 20 * 60 * 1000L // 20分
         const val DEFAULT_BREAK_DURATION_MILLIS = 20 * 1000L // 20秒
         const val UNLIMITED_REPEAT = -1
+        
+        val DEFAULT = TimerSettings()
     }
 
     fun isUnlimitedRepeat(): Boolean {

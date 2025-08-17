@@ -31,10 +31,11 @@ fun TimerScreen(
     val uiState by viewModel.uiState.collectAsState()
     val showSettings by viewModel.showSettings.collectAsState()
     val notificationSettings by viewModel.notificationSettings.collectAsState()
+    val timerSettings by viewModel.timerSettings.collectAsState()
     
     if (showSettings) {
         SettingsScreen(
-            currentSettings = uiState.timerState.settings,
+            currentSettings = timerSettings,
             currentNotificationSettings = notificationSettings,
             onSettingsChanged = { settings ->
                 viewModel.updateSettings(settings)
