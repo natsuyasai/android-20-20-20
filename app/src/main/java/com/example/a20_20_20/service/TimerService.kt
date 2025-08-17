@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
+import android.service.notification.StatusBarNotification
 import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerSettings
@@ -13,6 +14,7 @@ import com.example.a20_20_20.domain.TimerState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -24,6 +26,8 @@ class TimerService : Service() {
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
     private var wakeLock: PowerManager.WakeLock? = null
+    private var notificationCheckJob: kotlinx.coroutines.Job? = null
+    private var lastRestoreTime = 0L
     
     companion object {
         const val ACTION_START_TIMER = "com.example.a20_20_20.START_TIMER"
@@ -48,6 +52,13 @@ class TimerService : Service() {
             timerEngine.timerState.collect { state ->
                 updateNotification(state)
                 handlePhaseCompletion(state)
+                
+                // タイマーが動作中の場合は通知監視を開始
+                if (state.status != com.example.a20_20_20.domain.TimerStatus.STOPPED) {
+                    startNotificationMonitoring()
+                } else {
+                    stopNotificationMonitoring()
+                }
             }
         }
     }
@@ -58,6 +69,7 @@ class TimerService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        stopNotificationMonitoring()
         serviceJob.cancel()
         notificationManager.cleanup()
         // ウェイクロックを解除
@@ -228,6 +240,73 @@ class TimerService : Service() {
             }
         } else {
             android.util.Log.d("TimerService", "Timer is stopped, no notification to restore")
+        }
+    }
+    
+    private fun startNotificationMonitoring() {
+        // 既に監視中の場合は重複起動を防ぐ
+        if (notificationCheckJob?.isActive == true) {
+            return
+        }
+        
+        android.util.Log.d("TimerService", "Starting notification monitoring")
+        notificationCheckJob = serviceScope.launch {
+            while (true) {
+                delay(3000) // 3秒間隔でチェック
+                
+                val currentState = timerEngine.timerState.value
+                if (currentState.status == com.example.a20_20_20.domain.TimerStatus.STOPPED) {
+                    android.util.Log.d("TimerService", "Timer stopped, ending notification monitoring")
+                    break
+                }
+                
+                // 通知が削除されているかチェック
+                if (!isNotificationVisible()) {
+                    val currentTime = System.currentTimeMillis()
+                    // 最後の復元から5秒以上経過している場合のみ復元（連続復元を防ぐ）
+                    if (currentTime - lastRestoreTime > 5000) {
+                        android.util.Log.w("TimerService", "Notification was dismissed by user, restoring...")
+                        restoreNotification()
+                        lastRestoreTime = currentTime
+                    } else {
+                        android.util.Log.d("TimerService", "Notification restore skipped due to rate limiting")
+                    }
+                }
+            }
+        }
+    }
+    
+    private fun stopNotificationMonitoring() {
+        notificationCheckJob?.cancel()
+        notificationCheckJob = null
+        android.util.Log.d("TimerService", "Stopped notification monitoring")
+    }
+    
+    private fun isNotificationVisible(): Boolean {
+        return try {
+            // NotificationManagerから自アプリの通知を確認
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            
+            // Android 6.0以降では、アクティブな通知を確認できる
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                val activeNotifications: Array<StatusBarNotification> = notificationManager.activeNotifications
+                val hasTimerNotification = activeNotifications.any { notification ->
+                    notification.id == TimerNotificationManager.NOTIFICATION_ID
+                }
+                
+                android.util.Log.d("TimerService", "Checking notification visibility: found=${hasTimerNotification}, total active=${activeNotifications.size}")
+                return hasTimerNotification
+            } else {
+                // Android 6.0未満では直接確認できないため、状態ベースで判断
+                val currentState = timerEngine.timerState.value
+                val shouldBeVisible = currentState.status != com.example.a20_20_20.domain.TimerStatus.STOPPED
+                android.util.Log.d("TimerService", "Legacy notification check: should be visible=${shouldBeVisible}")
+                return shouldBeVisible
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("TimerService", "Error checking notification visibility", e)
+            // エラーの場合は安全側に倒して復元を試行
+            return false
         }
     }
 }

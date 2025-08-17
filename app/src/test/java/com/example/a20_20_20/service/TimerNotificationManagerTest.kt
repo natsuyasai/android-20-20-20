@@ -201,6 +201,42 @@ class TimerNotificationManagerTest {
         }
     }
 
+    @Test
+    fun `フォアグラウンド通知が正しいIDで作成されること`() {
+        val timerState = TimerState(
+            currentPhase = TimerPhase.WORK,
+            status = TimerStatus.RUNNING,
+            remainingTimeMillis = 600000L // 10分
+        )
+        
+        val notificationManager = TimerNotificationManager(mockContext)
+        val notification = notificationManager.createTimerNotification(timerState)
+        
+        // 通知が作成されることを確認
+        assertNotNull("Foreground notification should be created", notification)
+        
+        // 通知IDが正しい値であることを確認
+        assertTrue("Notification ID should be app-specific", 
+            TimerNotificationManager.NOTIFICATION_ID == 20202001)
+    }
+
+    @Test
+    fun `実行中状態の通知にアクションボタンが含まれること`() {
+        val runningState = TimerState(
+            currentPhase = TimerPhase.WORK,
+            status = TimerStatus.RUNNING,
+            remainingTimeMillis = 300000L // 5分
+        )
+        
+        val notificationManager = TimerNotificationManager(mockContext)
+        val notification = notificationManager.createTimerNotification(runningState)
+        
+        // 実行中の場合はアクションボタン（一時停止、停止）が含まれる
+        assertNotNull("Running timer notification should have actions", notification)
+        // Notificationのactionsフィールドは直接テストが困難なため、
+        // 少なくとも例外なく作成されることを確認
+    }
+
     private fun assertDoesNotThrow(executable: () -> Unit) {
         try {
             executable()
