@@ -84,7 +84,7 @@ class TimerNotificationManager(private val context: Context) {
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("$phaseLabel - $statusText")
             .setContentText("残り時間: $formattedTime")
-            .setSmallIcon(android.R.drawable.ic_dialog_info) // 実際のアプリではカスタムアイコンを使用
+            .setSmallIcon(R.drawable.ic_app_icon)
             .setContentIntent(pendingIntent)
             .setOngoing(timerState.status == TimerStatus.RUNNING)
             .setAutoCancel(false)
@@ -164,7 +164,7 @@ class TimerNotificationManager(private val context: Context) {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("フェーズ完了")
             .setContentText(message)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_app_icon)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setTimeoutAfter(2000) // 2秒後に自動削除

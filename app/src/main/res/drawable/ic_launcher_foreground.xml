@@ -1,30 +1,62 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:endX="85.84757"
-                android:endY="92.4963"
-                android:startX="42.9492"
-                android:startY="49.59793"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
+    
+    <!-- 目の形状 -->
     <path
         android:fillColor="#FFFFFF"
-        android:fillType="nonZero"
-        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
-        android:strokeWidth="1"
-        android:strokeColor="#00000000" />
+        android:pathData="M54,40c12,0 20,8 20,14s-8,14 -20,14s-20,-8 -20,-14S42,40 54,40z"/>
+    
+    <!-- 瞳孔 -->
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M54,46c4,0 8,3.5 8,8s-4,8 -8,8s-8,-3.5 -8,-8S50,46 54,46z"/>
+    
+    <!-- 反射光 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,50c1.1,0 2,0.9 2,2s-0.9,2 -2,2s-2,-0.9 -2,-2S50.9,50 52,50z"/>
+    
+    <!-- タイマーの外枠 -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M54,25c16,0 29,13 29,29s-13,29 -29,29s-29,-13 -29,-29S38,25 54,25z"
+        android:strokeWidth="3"
+        android:strokeColor="#FFFFFF"/>
+    
+    <!-- 時計の針 -->
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M54,30L54,54L65,54"
+        android:strokeWidth="3"
+        android:strokeColor="#FF5722"
+        android:strokeLineCap="round"/>
+    
+    <!-- 左の"2"の形状 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,75l0,-2l4,0c1,0 2,-1 2,-2l0,-1c0,-1 -1,-2 -2,-2l-2,0l0,-2l2,0c2,0 4,2 4,4l0,1c0,2 -2,4 -4,4l-4,0z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,75l6,0l0,2l-6,0z"/>
+    
+    <!-- 左の"0"の形状 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,75c0,2 1,3 3,3s3,-1 3,-3l0,-5c0,-2 -1,-3 -3,-3s-3,1 -3,3l0,5zM52,70c0,-1 0.5,-1 1,-1s1,0 1,1l0,5c0,1 -0.5,1 -1,1s-1,0 -1,-1l0,-5z"/>
+    
+    <!-- 右の"2"の形状 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,75l0,-2l4,0c1,0 2,-1 2,-2l0,-1c0,-1 -1,-2 -2,-2l-2,0l0,-2l2,0c2,0 4,2 4,4l0,1c0,2 -2,4 -4,4l-4,0z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,75l6,0l0,2l-6,0z"/>
+    
+    <!-- 右の"0"の形状 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M66,75c0,2 1,3 3,3s3,-1 3,-3l0,-5c0,-2 -1,-3 -3,-3s-3,1 -3,3l0,5zM68,70c0,-1 0.5,-1 1,-1s1,0 1,1l0,5c0,1 -0.5,1 -1,1s-1,0 -1,-1l0,-5z"/>
 </vector>
