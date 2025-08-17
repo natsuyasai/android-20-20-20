@@ -1,6 +1,8 @@
 package com.example.a20_20_20.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,17 +20,30 @@ import com.example.a20_20_20.ui.theme._20_20_20Theme
 @Composable
 fun TimerScreen(
     modifier: Modifier = Modifier,
-    viewModel: TimerViewModel = viewModel(factory = TimerViewModelFactory(LocalContext.current))
+    viewModel: TimerViewModel = viewModel(factory = TimerViewModelFactory())
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val showSettings by viewModel.showSettings.collectAsState()
     
-    TimerContent(
-        modifier = modifier,
-        uiState = uiState,
-        onStartClick = { viewModel.startTimer() },
-        onPauseClick = { viewModel.pauseTimer() },
-        onStopClick = { viewModel.stopTimer() }
-    )
+    if (showSettings) {
+        SettingsScreen(
+            currentSettings = uiState.timerState.settings,
+            onSettingsChanged = { settings ->
+                viewModel.updateSettings(settings)
+            },
+            onNavigateBack = { viewModel.navigateBack() },
+            modifier = modifier
+        )
+    } else {
+        TimerContent(
+            modifier = modifier,
+            uiState = uiState,
+            onStartClick = { viewModel.startTimer() },
+            onPauseClick = { viewModel.pauseTimer() },
+            onStopClick = { viewModel.stopTimer() },
+            onSettingsClick = { viewModel.navigateToSettings() }
+        )
+    }
 }
 
 @Composable
@@ -37,15 +52,30 @@ fun TimerContent(
     uiState: TimerUiState,
     onStartClick: () -> Unit,
     onPauseClick: () -> Unit,
-    onStopClick: () -> Unit
+    onStopClick: () -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // 設定ボタン
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "設定"
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
         // フェーズ表示
         Text(
             text = uiState.phaseLabel,
@@ -81,6 +111,8 @@ fun TimerContent(
             onPauseClick = onPauseClick,
             onStopClick = onStopClick
         )
+        
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
@@ -149,7 +181,8 @@ fun TimerScreenPreview() {
             uiState = TimerUiState(),
             onStartClick = {},
             onPauseClick = {},
-            onStopClick = {}
+            onStopClick = {},
+            onSettingsClick = {}
         )
     }
 }
