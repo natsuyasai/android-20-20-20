@@ -18,6 +18,7 @@ import androidx.core.app.NotificationCompat
 import com.example.a20_20_20.MainActivity
 import com.example.a20_20_20.R
 import com.example.a20_20_20.domain.NotificationSettings
+import com.example.a20_20_20.domain.SoundPlaybackMode
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerState
 import com.example.a20_20_20.domain.TimerStatus
@@ -195,12 +196,20 @@ class TimerNotificationManager(private val context: Context) {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(context, soundUri)
-                setAudioAttributes(
-                    AudioAttributes.Builder()
+                
+                // 再生方式に応じてAudioAttributesを設定
+                val audioAttributes = when (notificationSettings.soundPlaybackMode) {
+                    SoundPlaybackMode.NOTIFICATION -> AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                         .build()
-                )
+                    SoundPlaybackMode.MUSIC -> AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .build()
+                }
+                
+                setAudioAttributes(audioAttributes)
                 setVolume(notificationSettings.soundVolume, notificationSettings.soundVolume)
                 setOnCompletionListener { player ->
                     player.release()
