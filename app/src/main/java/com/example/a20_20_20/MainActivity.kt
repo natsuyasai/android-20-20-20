@@ -88,19 +88,36 @@ class MainActivity : ComponentActivity() {
         val currentState = app.timerState.value
         val service = app.getService()
         
-        // タイマーが実行中または一時停止中で、サービスが利用可能な場合
-        if (currentState.status != com.example.a20_20_20.domain.TimerStatus.STOPPED && service != null) {
-            // サービスの復旧メソッドを直接呼び出し
-            service.restoreNotification()
-        } else if (currentState.status != com.example.a20_20_20.domain.TimerStatus.STOPPED) {
-            // サービスが利用できない場合はサービス接続を試行
-            val intent = Intent(this, TimerService::class.java)
-            try {
-                startForegroundService(intent)
-            } catch (e: Exception) {
-                // サービス開始に失敗した場合はログを出力
-                android.util.Log.w("MainActivity", "Failed to start service for notification restore: ${e.message}")
+        android.util.Log.d("MainActivity", "Attempting to restore notification for state: ${currentState.status}")
+        
+        // タイマーが実行中または一時停止中の場合のみ復元処理を実行
+        if (currentState.status != com.example.a20_20_20.domain.TimerStatus.STOPPED) {
+            if (service != null) {
+                // サービスが利用可能な場合は直接復旧メソッドを呼び出し
+                android.util.Log.d("MainActivity", "Service available, calling restoreNotification")
+                service.restoreNotification()
+            } else {
+                // サービスが利用できない場合はサービス接続を試行
+                android.util.Log.d("MainActivity", "Service not available, starting foreground service")
+                val intent = Intent(this, TimerService::class.java)
+                try {
+                    // フォアグラウンドサービスを開始して通知を復元
+                    startForegroundService(intent)
+                    android.util.Log.d("MainActivity", "Foreground service started for notification restore")
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Failed to start service for notification restore", e)
+                    
+                    // フォアグラウンドサービス開始に失敗した場合は通常のサービス開始を試行
+                    try {
+                        startService(intent)
+                        android.util.Log.d("MainActivity", "Regular service started as fallback")
+                    } catch (fallbackException: Exception) {
+                        android.util.Log.e("MainActivity", "Failed to start service even with fallback", fallbackException)
+                    }
+                }
             }
+        } else {
+            android.util.Log.d("MainActivity", "Timer is stopped, no notification restoration needed")
         }
     }
     

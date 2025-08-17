@@ -437,6 +437,10 @@ class TimerNotificationManager(private val context: Context) {
         updateNotificationChannel()
     }
     
+    fun getCurrentNotificationSettings(): NotificationSettings {
+        return notificationSettings
+    }
+    
     private fun ensureNotificationChannelExists() {
         if (!channelCreated) {
             createNotificationChannel()
