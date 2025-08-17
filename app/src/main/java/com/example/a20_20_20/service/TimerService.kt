@@ -144,7 +144,8 @@ class TimerService : Service() {
         }
     }
 
-    private var lastCompletedPhase: TimerPhase? = null
+    private var lastObservedPhase: TimerPhase? = null
+    private var lastObservedCycle: Int = 0
     private var lastRemainingTime: Long = Long.MAX_VALUE
 
     private fun handlePhaseCompletion(state: TimerState) {
@@ -153,14 +154,18 @@ class TimerService : Service() {
             return
         }
         
-        // フェーズが変わった場合のみ通知音を鳴らす
-        if (state.remainingTimeMillis > lastRemainingTime) {
-            // 残り時間が増加した = フェーズが変わった
-            lastCompletedPhase?.let { completedPhase ->
-                notificationManager.showPhaseCompletionNotification(completedPhase)
-            }
-            lastCompletedPhase = state.currentPhase
+        // フェーズまたはサイクルが変わった場合に通知音を鳴らす
+        val currentPhase = state.currentPhase
+        val currentCycle = state.completedCycles
+        
+        if (lastObservedPhase != null && 
+            (lastObservedPhase != currentPhase || lastObservedCycle != currentCycle)) {
+            // フェーズまたはサイクルが変わった = 前のフェーズが完了した
+            notificationManager.showPhaseCompletionNotification(lastObservedPhase!!)
         }
+        
+        lastObservedPhase = currentPhase
+        lastObservedCycle = currentCycle
         lastRemainingTime = state.remainingTimeMillis
     }
 
