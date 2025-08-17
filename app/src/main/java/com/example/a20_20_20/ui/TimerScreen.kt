@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -17,7 +18,7 @@ import com.example.a20_20_20.ui.theme._20_20_20Theme
 @Composable
 fun TimerScreen(
     modifier: Modifier = Modifier,
-    viewModel: TimerViewModel = viewModel()
+    viewModel: TimerViewModel = viewModel(factory = TimerViewModelFactory(LocalContext.current))
 ) {
     val uiState by viewModel.uiState.collectAsState()
     

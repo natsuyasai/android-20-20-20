@@ -91,6 +91,10 @@ class TimerNotificationManager(private val context: Context) {
         notificationManager.notify(PHASE_COMPLETION_NOTIFICATION_ID, notification)
     }
 
+    fun notify(notificationId: Int, notification: Notification) {
+        notificationManager.notify(notificationId, notification)
+    }
+
     private fun formatTime(timeInMillis: Long): String {
         val totalSeconds = ceil(timeInMillis / 1000.0).toInt()
         val minutes = totalSeconds / 60
