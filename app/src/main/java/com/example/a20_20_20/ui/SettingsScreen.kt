@@ -87,9 +87,8 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .verticalScroll(scrollState),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         // タイトル
         Row(
@@ -101,7 +100,7 @@ fun SettingsScreen(
             }
             Text(
                 text = "設定",
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineSmall
             )
         }
 
