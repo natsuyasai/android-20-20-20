@@ -110,8 +110,10 @@ class TimerEngine(
                 val newRemainingTime = phaseDuration - phaseElapsedTime
                 
                 if (newRemainingTime <= 0) {
-                    // フェーズ完了
+                    // フェーズ完了 - 即座に処理して次のフェーズに移行
                     handlePhaseCompletion(currentState)
+                    // フェーズが切り替わった場合は短時間後に再度更新（遅延なしで次のフェーズを開始）
+                    delay(50L) // 50ms後に次のフェーズの更新を開始
                 } else {
                     // 時間更新
                     _timerState.value = currentState.copy(remainingTimeMillis = newRemainingTime)
