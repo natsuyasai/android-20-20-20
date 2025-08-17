@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.net.Uri
 import com.example.a20_20_20.domain.NotificationPriority
 import com.example.a20_20_20.domain.NotificationSettings
+import com.example.a20_20_20.domain.NotificationUpdateInterval
 import com.example.a20_20_20.domain.SoundPlaybackMode
 import com.example.a20_20_20.domain.TimerSettings
 
@@ -28,6 +29,7 @@ class SettingsRepository(context: Context) {
         const val KEY_SOUND_VOLUME = "sound_volume"
         const val KEY_SOUND_PLAYBACK_MODE = "sound_playback_mode"
         const val KEY_NOTIFICATION_PRIORITY = "notification_priority"
+        const val KEY_UPDATE_INTERVAL = "update_interval"
     }
     
     fun saveTimerSettings(settings: TimerSettings) {
@@ -56,6 +58,7 @@ class SettingsRepository(context: Context) {
             putFloat(KEY_SOUND_VOLUME, settings.soundVolume)
             putString(KEY_SOUND_PLAYBACK_MODE, settings.soundPlaybackMode.name)
             putString(KEY_NOTIFICATION_PRIORITY, settings.priority.name)
+            putString(KEY_UPDATE_INTERVAL, settings.updateInterval.name)
             apply()
         }
     }
@@ -65,6 +68,7 @@ class SettingsRepository(context: Context) {
         val breakSoundStr = preferences.getString(KEY_BREAK_COMPLETE_SOUND, null)
         val soundPlaybackModeStr = preferences.getString(KEY_SOUND_PLAYBACK_MODE, SoundPlaybackMode.NOTIFICATION.name)
         val priorityStr = preferences.getString(KEY_NOTIFICATION_PRIORITY, NotificationPriority.DEFAULT.name)
+        val updateIntervalStr = preferences.getString(KEY_UPDATE_INTERVAL, NotificationUpdateInterval.EVERY_SECOND.name)
         
         return NotificationSettings(
             workCompleteSound = workSoundStr?.let { Uri.parse(it) },
@@ -81,6 +85,11 @@ class SettingsRepository(context: Context) {
                 NotificationPriority.valueOf(priorityStr!!)
             } catch (e: Exception) {
                 NotificationPriority.DEFAULT
+            },
+            updateInterval = try {
+                NotificationUpdateInterval.valueOf(updateIntervalStr!!)
+            } catch (e: Exception) {
+                NotificationUpdateInterval.EVERY_SECOND
             }
         )
     }
