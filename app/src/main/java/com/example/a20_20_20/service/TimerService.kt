@@ -200,10 +200,34 @@ class TimerService : Service() {
     
     fun restoreNotification() {
         val currentState = timerEngine.timerState.value
+        android.util.Log.d("TimerService", "Restoring notification for state: ${currentState.status}")
+        
         // 停止状態以外の場合は通知を復旧
         if (currentState.status != com.example.a20_20_20.domain.TimerStatus.STOPPED) {
-            val notification = notificationManager.createTimerNotification(currentState)
-            startForeground(TimerNotificationManager.NOTIFICATION_ID, notification)
+            try {
+                // 通知チャンネルが正しく設定されていることを確認
+                val notification = notificationManager.createTimerNotification(currentState)
+                
+                // フォアグラウンドサービスとして通知を表示
+                startForeground(TimerNotificationManager.NOTIFICATION_ID, notification)
+                
+                android.util.Log.d("TimerService", "Notification restored successfully with ID: ${TimerNotificationManager.NOTIFICATION_ID}")
+            } catch (e: Exception) {
+                android.util.Log.e("TimerService", "Failed to restore notification", e)
+                
+                // 復元に失敗した場合は、サービスの状態を正常化
+                try {
+                    // 通知設定をリセットして再試行
+                    notificationManager.updateSettings(notificationManager.getCurrentNotificationSettings())
+                    val notification = notificationManager.createTimerNotification(currentState)
+                    startForeground(TimerNotificationManager.NOTIFICATION_ID, notification)
+                    android.util.Log.d("TimerService", "Notification restored after reset")
+                } catch (retryException: Exception) {
+                    android.util.Log.e("TimerService", "Failed to restore notification even after reset", retryException)
+                }
+            }
+        } else {
+            android.util.Log.d("TimerService", "Timer is stopped, no notification to restore")
         }
     }
 }

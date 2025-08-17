@@ -112,6 +112,16 @@ class TimerApplication : Application() {
     }
 
     fun getService(): TimerService? = timerService
+    
+    fun restoreNotificationIfNeeded() {
+        // サービスが接続されている場合は直接復元
+        timerService?.restoreNotification()
+            ?: run {
+                // サービスが接続されていない場合は再接続を試行
+                android.util.Log.d("TimerApplication", "Service not connected, attempting to reconnect")
+                bindToTimerService()
+            }
+    }
 
     companion object {
         @Volatile

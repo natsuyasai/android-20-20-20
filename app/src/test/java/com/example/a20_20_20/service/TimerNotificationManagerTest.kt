@@ -165,6 +165,42 @@ class TimerNotificationManagerTest {
         assertTrue("Phase completion notification has auto-cancel mechanism", true)
     }
 
+    @Test
+    fun `通知復元時に現在の設定が正しく取得できること`() {
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        val testSettings = NotificationSettings(
+            enableSound = false,
+            soundPlaybackMode = SoundPlaybackMode.NOTIFICATION,
+            soundVolume = 0.5f
+        )
+        
+        notificationManager.updateSettings(testSettings)
+        
+        val currentSettings = notificationManager.getCurrentNotificationSettings()
+        
+        // 設定した値が正しく保持されていることを確認
+        assertEquals("Sound setting should match", testSettings.enableSound, currentSettings.enableSound)
+        assertEquals("Sound playback mode should match", testSettings.soundPlaybackMode, currentSettings.soundPlaybackMode)
+        assertEquals("Sound volume should match", testSettings.soundVolume, currentSettings.soundVolume, 0.01f)
+    }
+
+    @Test
+    fun `通知作成時に例外が発生しても安全に処理されること`() {
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        // 無効な状態でも通知作成が例外をスローしないことを確認
+        val invalidState = TimerState(
+            currentPhase = TimerPhase.WORK,
+            status = TimerStatus.RUNNING,
+            remainingTimeMillis = -1L // 無効な値
+        )
+        
+        assertDoesNotThrow {
+            notificationManager.createTimerNotification(invalidState)
+        }
+    }
+
     private fun assertDoesNotThrow(executable: () -> Unit) {
         try {
             executable()
