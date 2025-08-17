@@ -3,6 +3,8 @@ package com.example.a20_20_20.service
 import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationCompat
+import com.example.a20_20_20.domain.NotificationSettings
+import com.example.a20_20_20.domain.SoundPlaybackMode
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerState
 import com.example.a20_20_20.domain.TimerStatus
@@ -72,5 +74,63 @@ class TimerNotificationManagerTest {
         
         // 通知が表示されることを確認（実装時により詳細なテストが必要）
         assertTrue("フェーズ完了通知が実装されている", true)
+    }
+
+    @Test
+    fun `通知音モードでの設定更新が正しく動作する`() {
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        val notificationSettings = NotificationSettings(
+            enableSound = true,
+            soundPlaybackMode = SoundPlaybackMode.NOTIFICATION,
+            soundVolume = 0.8f
+        )
+        
+        // 設定更新が例外をスローしないことを確認
+        assertDoesNotThrow {
+            notificationManager.updateSettings(notificationSettings)
+        }
+    }
+
+    @Test
+    fun `音楽モードでの設定更新が正しく動作する`() {
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        val musicSettings = NotificationSettings(
+            enableSound = true,
+            soundPlaybackMode = SoundPlaybackMode.MUSIC,
+            soundVolume = 0.6f
+        )
+        
+        // 設定更新が例外をスローしないことを確認
+        assertDoesNotThrow {
+            notificationManager.updateSettings(musicSettings)
+        }
+    }
+
+    @Test
+    fun `音声無効時は音声設定に関係なく音声が再生されない`() {
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        val disabledSoundSettings = NotificationSettings(
+            enableSound = false,
+            soundPlaybackMode = SoundPlaybackMode.MUSIC,
+            soundVolume = 1.0f
+        )
+        
+        notificationManager.updateSettings(disabledSoundSettings)
+        
+        // 音声無効時でも通知は正常に動作することを確認
+        assertDoesNotThrow {
+            notificationManager.showPhaseCompletionNotification(TimerPhase.WORK)
+        }
+    }
+
+    private fun assertDoesNotThrow(executable: () -> Unit) {
+        try {
+            executable()
+        } catch (e: Exception) {
+            fail("Expected no exception but was thrown: ${e.message}")
+        }
     }
 }

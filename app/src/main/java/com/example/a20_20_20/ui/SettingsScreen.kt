@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.a20_20_20.domain.NotificationSettings
+import com.example.a20_20_20.domain.SoundPlaybackMode
 import com.example.a20_20_20.domain.TimerSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,6 +56,7 @@ fun SettingsScreen(
     var soundVolume by remember { mutableFloatStateOf(currentNotificationSettings.soundVolume) }
     var workCompleteSound by remember { mutableStateOf(currentNotificationSettings.workCompleteSound) }
     var breakCompleteSound by remember { mutableStateOf(currentNotificationSettings.breakCompleteSound) }
+    var soundPlaybackMode by remember { mutableStateOf(currentNotificationSettings.soundPlaybackMode) }
     
     val context = LocalContext.current
     
@@ -264,6 +266,28 @@ fun SettingsScreen(
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
+                    // 音声再生方式選択
+                    Text("音声再生方式")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = soundPlaybackMode == SoundPlaybackMode.NOTIFICATION,
+                            onClick = { soundPlaybackMode = SoundPlaybackMode.NOTIFICATION },
+                            label = { Text("通知音") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = soundPlaybackMode == SoundPlaybackMode.MUSIC,
+                            onClick = { soundPlaybackMode = SoundPlaybackMode.MUSIC },
+                            label = { Text("音楽") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
                     // ワーク完了音選択
                     Button(
                         onClick = {
@@ -328,7 +352,8 @@ fun SettingsScreen(
                     breakCompleteSound = breakCompleteSound,
                     enableSound = enableSound,
                     enableVibration = enableVibration,
-                    soundVolume = soundVolume
+                    soundVolume = soundVolume,
+                    soundPlaybackMode = soundPlaybackMode
                 )
                 onSettingsChanged(newSettings)
                 onNotificationSettingsChanged(newNotificationSettings)
