@@ -27,18 +27,25 @@ class TimerEngine(
 
     fun start() {
         val currentState = _timerState.value
-        if (currentState.status == TimerStatus.STOPPED) {
-            // 新規開始
-            startTimeMillis = System.currentTimeMillis()
-            pausedTimeMillis = 0L
-            _timerState.value = currentState.start()
-            startCountdown()
-        } else if (currentState.status == TimerStatus.PAUSED) {
-            // 再開
-            val pauseStartTime = startTimeMillis + (currentState.settings.workDurationMillis - currentState.remainingTimeMillis) + pausedTimeMillis
-            pausedTimeMillis += System.currentTimeMillis() - pauseStartTime
-            _timerState.value = currentState.start()
-            startCountdown()
+        when (currentState.status) {
+            TimerStatus.STOPPED -> {
+                // 新規開始
+                startTimeMillis = System.currentTimeMillis()
+                pausedTimeMillis = 0L
+                _timerState.value = currentState.start()
+                startCountdown()
+            }
+            TimerStatus.PAUSED -> {
+                // 再開
+                val pauseStartTime = startTimeMillis + (currentState.settings.workDurationMillis - currentState.remainingTimeMillis) + pausedTimeMillis
+                pausedTimeMillis += System.currentTimeMillis() - pauseStartTime
+                _timerState.value = currentState.start()
+                startCountdown()
+            }
+            TimerStatus.RUNNING -> {
+                // 既に実行中の場合は何もしない（2重起動防止）
+                // ログ出力やデバッグ用（プロダクションでは削除可能）
+            }
         }
     }
 
