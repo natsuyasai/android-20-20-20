@@ -48,6 +48,7 @@ class TimerService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         serviceJob.cancel()
+        notificationManager.cleanup()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
