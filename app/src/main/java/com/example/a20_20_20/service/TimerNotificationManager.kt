@@ -40,7 +40,8 @@ class TimerNotificationManager(private val context: Context) {
     private var channelCreated = false
     
     companion object {
-        const val CHANNEL_ID = "timer_channel"
+        const val CHANNEL_ID_SILENT = "timer_channel_silent"
+        const val CHANNEL_ID_DEFAULT = "timer_channel_default"
         const val NOTIFICATION_ID = 1
         const val PHASE_COMPLETION_NOTIFICATION_ID = 2
     }
@@ -51,26 +52,53 @@ class TimerNotificationManager(private val context: Context) {
     }
 
     private fun createNotificationChannel() {
-        val importance = when (notificationSettings.priority) {
-            NotificationPriority.SILENT -> NotificationManager.IMPORTANCE_LOW
-            NotificationPriority.DEFAULT -> NotificationManager.IMPORTANCE_DEFAULT
-        }
-
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "タイマー通知",
-            importance
-        ).apply {
-            description = "20-20-20タイマーの通知"
-            setShowBadge(false)
-
-            // サイレントモードの場合は音とバイブレーションを無効化
-            if (notificationSettings.priority == NotificationPriority.SILENT) {
-                setSound(null, null)
-                enableVibration(false)
+        // 古いチャンネルがあれば削除
+        deleteOldChannelIfExists()
+        
+        // 両方のチャンネルを作成（必要に応じて）
+        createChannelIfNotExists(CHANNEL_ID_SILENT, "タイマー通知（サイレント）", NotificationManager.IMPORTANCE_LOW, true)
+        createChannelIfNotExists(CHANNEL_ID_DEFAULT, "タイマー通知（デフォルト）", NotificationManager.IMPORTANCE_DEFAULT, false)
+    }
+    
+    private fun deleteOldChannelIfExists() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                // 古いチャンネルID "timer_channel" を削除
+                notificationManager.deleteNotificationChannel("timer_channel")
+            } catch (e: Exception) {
+                // 削除に失敗してもクラッシュしないように
             }
         }
-        notificationManager.createNotificationChannel(channel)
+    }
+    
+    private fun createChannelIfNotExists(channelId: String, channelName: String, importance: Int, silent: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // 既存のチャンネルを確認
+            val existingChannel = notificationManager.getNotificationChannel(channelId)
+            if (existingChannel == null) {
+                val channel = NotificationChannel(
+                    channelId,
+                    channelName,
+                    importance
+                ).apply {
+                    description = "20-20-20タイマーの通知"
+                    setShowBadge(false)
+                    
+                    if (silent) {
+                        setSound(null, null)
+                        enableVibration(false)
+                    }
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+        }
+    }
+    
+    private fun getCurrentChannelId(): String {
+        return when (notificationSettings.priority) {
+            NotificationPriority.SILENT -> CHANNEL_ID_SILENT
+            NotificationPriority.DEFAULT -> CHANNEL_ID_DEFAULT
+        }
     }
     
     private fun updateNotificationChannel() {
@@ -101,7 +129,7 @@ class TimerNotificationManager(private val context: Context) {
             TimerStatus.STOPPED -> "停止"
         }
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, getCurrentChannelId())
             .setContentTitle("$phaseLabel - $statusText")
             .setContentText("残り時間: $formattedTime")
             .setSmallIcon(R.drawable.ic_app_icon)
@@ -188,7 +216,7 @@ class TimerNotificationManager(private val context: Context) {
             NotificationPriority.DEFAULT -> NotificationCompat.PRIORITY_HIGH
         }
         
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, getCurrentChannelId())
             .setContentTitle("フェーズ完了")
             .setContentText(message)
             .setSmallIcon(R.drawable.ic_app_icon)
