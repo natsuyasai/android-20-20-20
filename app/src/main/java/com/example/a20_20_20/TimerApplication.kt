@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import com.example.a20_20_20.data.SettingsRepository
 import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.TimerSettings
 import com.example.a20_20_20.domain.TimerState
@@ -24,18 +25,26 @@ class TimerApplication : Application() {
     private var isBound = false
     
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private lateinit var settingsRepository: SettingsRepository
     
     private val _timerState = MutableStateFlow(TimerState())
     val timerState: StateFlow<TimerState> = _timerState.asStateFlow()
     
     private val _notificationSettings = MutableStateFlow(NotificationSettings.DEFAULT)
     val notificationSettings: StateFlow<NotificationSettings> = _notificationSettings.asStateFlow()
+    
+    private val _timerSettings = MutableStateFlow<TimerSettings>(TimerSettings.DEFAULT)
+    val timerSettings: StateFlow<TimerSettings> = _timerSettings.asStateFlow()
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
             val binder = service as TimerService.TimerServiceBinder
             timerService = binder.getService()
             isBound = true
+            
+            // 保存された設定をサービスに反映
+            timerService?.updateTimerSettings(_timerSettings.value)
+            timerService?.updateNotificationSettings(_notificationSettings.value)
             
             // サービスの状態をアプリケーション全体で共有
             applicationScope.launch {
@@ -54,7 +63,22 @@ class TimerApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        
+        // 設定リポジトリの初期化
+        settingsRepository = SettingsRepository(this)
+        
+        // 保存された設定を読み込み
+        loadSettings()
+        
         bindToTimerService()
+    }
+    
+    private fun loadSettings() {
+        val savedTimerSettings = settingsRepository.loadTimerSettings()
+        val savedNotificationSettings = settingsRepository.loadNotificationSettings()
+        
+        _timerSettings.value = savedTimerSettings
+        _notificationSettings.value = savedNotificationSettings
     }
 
     private fun bindToTimerService() {
@@ -76,11 +100,14 @@ class TimerApplication : Application() {
     }
 
     fun updateSettings(settings: TimerSettings) {
+        _timerSettings.value = settings
+        settingsRepository.saveTimerSettings(settings)
         timerService?.updateTimerSettings(settings)
     }
     
     fun updateNotificationSettings(settings: NotificationSettings) {
         _notificationSettings.value = settings
+        settingsRepository.saveNotificationSettings(settings)
         timerService?.updateNotificationSettings(settings)
     }
 

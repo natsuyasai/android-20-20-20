@@ -23,6 +23,7 @@ class TimerViewModel : ViewModel() {
     val showSettings: StateFlow<Boolean> = _showSettings.asStateFlow()
     
     val notificationSettings: StateFlow<NotificationSettings> = application.notificationSettings
+    val timerSettings: StateFlow<TimerSettings> = application.timerSettings
 
     init {
         // アプリケーションからタイマー状態を監視

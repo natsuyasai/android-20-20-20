@@ -7,13 +7,19 @@ enum class SoundPlaybackMode {
     MUSIC        // 音楽として再生
 }
 
+enum class NotificationPriority {
+    SILENT,  // サイレント（優先度低）
+    DEFAULT  // デフォルト（通常の優先度）
+}
+
 data class NotificationSettings(
     val workCompleteSound: Uri? = null, // null = デフォルト通知音
     val breakCompleteSound: Uri? = null, // null = デフォルト通知音
     val enableSound: Boolean = true,
     val enableVibration: Boolean = true,
     val soundVolume: Float = 1.0f, // 0.0f - 1.0f
-    val soundPlaybackMode: SoundPlaybackMode = SoundPlaybackMode.NOTIFICATION // 音声再生方式
+    val soundPlaybackMode: SoundPlaybackMode = SoundPlaybackMode.NOTIFICATION, // 音声再生方式
+    val priority: NotificationPriority = NotificationPriority.DEFAULT // 通知の優先度
 ) {
     companion object {
         val DEFAULT = NotificationSettings()

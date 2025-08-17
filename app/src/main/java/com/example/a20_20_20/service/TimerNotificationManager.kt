@@ -18,6 +18,7 @@ import androidx.core.app.NotificationCompat
 import com.example.a20_20_20.MainActivity
 import com.example.a20_20_20.R
 import com.example.a20_20_20.domain.NotificationSettings
+import com.example.a20_20_20.domain.NotificationPriority
 import com.example.a20_20_20.domain.SoundPlaybackMode
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerState
@@ -36,6 +37,7 @@ class TimerNotificationManager(private val context: Context) {
     private var notificationSettings = NotificationSettings.DEFAULT
     private var mediaPlayer: MediaPlayer? = null
     private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var channelCreated = false
     
     companion object {
         const val CHANNEL_ID = "timer_channel"
@@ -44,24 +46,43 @@ class TimerNotificationManager(private val context: Context) {
     }
 
     init {
-        createNotificationChannel()
+        // 初期化時には通知チャンネルを作成しない
+        // updateSettings()が呼ばれた時に作成する
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val importance = when (notificationSettings.priority) {
+                NotificationPriority.SILENT -> NotificationManager.IMPORTANCE_LOW
+                NotificationPriority.DEFAULT -> NotificationManager.IMPORTANCE_DEFAULT
+            }
+            
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "タイマー通知",
-                NotificationManager.IMPORTANCE_LOW
+                importance
             ).apply {
                 description = "20-20-20タイマーの通知"
                 setShowBadge(false)
+                
+                // サイレントモードの場合は音とバイブレーションを無効化
+                if (notificationSettings.priority == NotificationPriority.SILENT) {
+                    setSound(null, null)
+                    enableVibration(false)
+                }
             }
             notificationManager.createNotificationChannel(channel)
         }
     }
+    
+    private fun updateNotificationChannel() {
+        createNotificationChannel()
+        channelCreated = true
+    }
 
     fun createTimerNotification(timerState: TimerState): Notification {
+        ensureNotificationChannelExists()
+        
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -157,16 +178,23 @@ class TimerNotificationManager(private val context: Context) {
     }
 
     fun showPhaseCompletionNotification(completedPhase: TimerPhase) {
+        ensureNotificationChannelExists()
+        
         val message = when (completedPhase) {
             TimerPhase.WORK -> "ワーク時間が完了しました。ブレイクタイムです！"
             TimerPhase.BREAK -> "ブレイク時間が完了しました。ワークを開始してください。"
         }
 
+        val priority = when (notificationSettings.priority) {
+            NotificationPriority.SILENT -> NotificationCompat.PRIORITY_LOW
+            NotificationPriority.DEFAULT -> NotificationCompat.PRIORITY_HIGH
+        }
+        
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("フェーズ完了")
             .setContentText(message)
             .setSmallIcon(R.drawable.ic_app_icon)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(priority)
             .setAutoCancel(true)
             .setTimeoutAfter(2000) // 2秒後に自動削除
             .build()
@@ -179,9 +207,11 @@ class TimerNotificationManager(private val context: Context) {
             notificationManager.cancel(PHASE_COMPLETION_NOTIFICATION_ID)
         }
         
-        // 通知音とバイブレーションを再生
-        playNotificationSound(completedPhase)
-        triggerVibration()
+        // サイレントモード以外の場合のみ通知音とバイブレーションを再生
+        if (notificationSettings.priority != NotificationPriority.SILENT) {
+            playNotificationSound(completedPhase)
+            triggerVibration()
+        }
     }
 
     private fun playNotificationSound(completedPhase: TimerPhase) {
@@ -251,6 +281,14 @@ class TimerNotificationManager(private val context: Context) {
 
     fun updateSettings(settings: NotificationSettings) {
         notificationSettings = settings
+        updateNotificationChannel()
+    }
+    
+    private fun ensureNotificationChannelExists() {
+        if (!channelCreated) {
+            createNotificationChannel()
+            channelCreated = true
+        }
     }
 
     fun cleanup() {
