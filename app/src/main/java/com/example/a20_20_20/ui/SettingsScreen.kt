@@ -6,6 +6,7 @@ import android.media.RingtoneManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -181,7 +182,8 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { isUnlimited = !isUnlimited }
                 ) {
                     Checkbox(
                         checked = isUnlimited,
@@ -230,7 +232,8 @@ fun SettingsScreen(
                 
                 // サウンド有効/無効
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { enableSound = !enableSound }
                 ) {
                     Checkbox(
                         checked = enableSound,
@@ -290,7 +293,8 @@ fun SettingsScreen(
                 
                 // バイブレーション設定
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { enableVibration = !enableVibration }
                 ) {
                     Checkbox(
                         checked = enableVibration,
