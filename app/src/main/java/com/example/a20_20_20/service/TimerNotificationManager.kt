@@ -6,10 +6,18 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import com.example.a20_20_20.MainActivity
 import com.example.a20_20_20.R
+import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerState
 import com.example.a20_20_20.domain.TimerStatus
@@ -18,6 +26,8 @@ import kotlin.math.ceil
 class TimerNotificationManager(private val context: Context) {
     
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    private var notificationSettings = NotificationSettings.DEFAULT
+    private var mediaPlayer: MediaPlayer? = null
     
     companion object {
         const val CHANNEL_ID = "timer_channel"
@@ -64,14 +74,78 @@ class TimerNotificationManager(private val context: Context) {
             TimerStatus.STOPPED -> "停止"
         }
 
-        return NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("$phaseLabel - $statusText")
             .setContentText("残り時間: $formattedTime")
             .setSmallIcon(android.R.drawable.ic_dialog_info) // 実際のアプリではカスタムアイコンを使用
             .setContentIntent(pendingIntent)
             .setOngoing(timerState.status == TimerStatus.RUNNING)
             .setAutoCancel(false)
-            .build()
+
+        // 状態に応じてアクションボタンを追加
+        when (timerState.status) {
+            TimerStatus.RUNNING -> {
+                // 一時停止と停止ボタン
+                builder.addAction(createPauseAction())
+                builder.addAction(createStopAction())
+            }
+            TimerStatus.PAUSED -> {
+                // 再開と停止ボタン
+                builder.addAction(createStartAction())
+                builder.addAction(createStopAction())
+            }
+            TimerStatus.STOPPED -> {
+                // 開始ボタンのみ
+                builder.addAction(createStartAction())
+            }
+        }
+
+        return builder.build()
+    }
+
+    private fun createStartAction(): NotificationCompat.Action {
+        val intent = Intent(context, TimerService::class.java).apply {
+            action = TimerService.ACTION_START_TIMER
+        }
+        val pendingIntent = PendingIntent.getService(
+            context, 1, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        return NotificationCompat.Action(
+            android.R.drawable.ic_media_play,
+            "開始",
+            pendingIntent
+        )
+    }
+
+    private fun createPauseAction(): NotificationCompat.Action {
+        val intent = Intent(context, TimerService::class.java).apply {
+            action = TimerService.ACTION_PAUSE_TIMER
+        }
+        val pendingIntent = PendingIntent.getService(
+            context, 2, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        return NotificationCompat.Action(
+            android.R.drawable.ic_media_pause,
+            "一時停止",
+            pendingIntent
+        )
+    }
+
+    private fun createStopAction(): NotificationCompat.Action {
+        val intent = Intent(context, TimerService::class.java).apply {
+            action = TimerService.ACTION_STOP_TIMER
+        }
+        val pendingIntent = PendingIntent.getService(
+            context, 3, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        return NotificationCompat.Action(
+            android.R.drawable.ic_delete,
+            "停止",
+            pendingIntent
+        )
     }
 
     fun showPhaseCompletionNotification(completedPhase: TimerPhase) {
@@ -89,6 +163,76 @@ class TimerNotificationManager(private val context: Context) {
             .build()
 
         notificationManager.notify(PHASE_COMPLETION_NOTIFICATION_ID, notification)
+        
+        // 通知音とバイブレーションを再生
+        playNotificationSound(completedPhase)
+        triggerVibration()
+    }
+
+    private fun playNotificationSound(completedPhase: TimerPhase) {
+        if (!notificationSettings.enableSound) return
+
+        val soundUri = when (completedPhase) {
+            TimerPhase.WORK -> notificationSettings.workCompleteSound
+            TimerPhase.BREAK -> notificationSettings.breakCompleteSound
+        } ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+        try {
+            mediaPlayer?.release()
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(context, soundUri)
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .build()
+                )
+                setVolume(notificationSettings.soundVolume, notificationSettings.soundVolume)
+                setOnCompletionListener { player ->
+                    player.release()
+                    mediaPlayer = null
+                }
+                prepareAsync()
+                setOnPreparedListener { player ->
+                    player.start()
+                }
+            }
+        } catch (e: Exception) {
+            // サウンド再生エラーの場合はログに記録し、続行
+            e.printStackTrace()
+        }
+    }
+
+    private fun triggerVibration() {
+        if (!notificationSettings.enableVibration) return
+
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+
+        if (vibrator.hasVibrator()) {
+            val vibrationPattern = longArrayOf(0, 200, 100, 200, 100, 200) // パターン: 待機, バイブ, 停止, バイブ, 停止, バイブ
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createWaveform(vibrationPattern, -1))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(vibrationPattern, -1)
+            }
+        }
+    }
+
+    fun updateNotificationSettings(settings: NotificationSettings) {
+        notificationSettings = settings
+    }
+
+    fun cleanup() {
+        mediaPlayer?.release()
+        mediaPlayer = null
     }
 
     fun notify(notificationId: Int, notification: Notification) {
