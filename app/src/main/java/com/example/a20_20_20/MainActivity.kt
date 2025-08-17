@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.example.a20_20_20.service.TimerService
 import com.example.a20_20_20.ui.TimerScreen
 import com.example.a20_20_20.ui.theme._20_20_20Theme
 
@@ -78,6 +79,29 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // アプリが表示されるたびに権限をチェック
         checkAndRequestPermissions()
+        // タイマー実行中の場合は通知を復旧
+        restoreNotificationIfNeeded()
+    }
+    
+    private fun restoreNotificationIfNeeded() {
+        val app = TimerApplication.getInstance()
+        val currentState = app.timerState.value
+        val service = app.getService()
+        
+        // タイマーが実行中または一時停止中で、サービスが利用可能な場合
+        if (currentState.status != com.example.a20_20_20.domain.TimerStatus.STOPPED && service != null) {
+            // サービスの復旧メソッドを直接呼び出し
+            service.restoreNotification()
+        } else if (currentState.status != com.example.a20_20_20.domain.TimerStatus.STOPPED) {
+            // サービスが利用できない場合はサービス接続を試行
+            val intent = Intent(this, TimerService::class.java)
+            try {
+                startForegroundService(intent)
+            } catch (e: Exception) {
+                // サービス開始に失敗した場合はログを出力
+                android.util.Log.w("MainActivity", "Failed to start service for notification restore: ${e.message}")
+            }
+        }
     }
     
     private fun checkAndRequestPermissions() {

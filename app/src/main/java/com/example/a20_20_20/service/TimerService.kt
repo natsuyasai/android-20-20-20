@@ -140,7 +140,8 @@ class TimerService : Service() {
     private fun updateNotification(state: TimerState) {
         if (state.status != com.example.a20_20_20.domain.TimerStatus.STOPPED) {
             val notification = notificationManager.createTimerNotification(state)
-            notificationManager.notify(TimerNotificationManager.NOTIFICATION_ID, notification)
+            // フォアグラウンド通知として更新（削除されても復旧）
+            startForeground(TimerNotificationManager.NOTIFICATION_ID, notification)
         }
     }
 
@@ -195,5 +196,14 @@ class TimerService : Service() {
     
     fun stopTimerEngine() {
         stopTimer()
+    }
+    
+    fun restoreNotification() {
+        val currentState = timerEngine.timerState.value
+        // 停止状態以外の場合は通知を復旧
+        if (currentState.status != com.example.a20_20_20.domain.TimerStatus.STOPPED) {
+            val notification = notificationManager.createTimerNotification(currentState)
+            startForeground(TimerNotificationManager.NOTIFICATION_ID, notification)
+        }
     }
 }
