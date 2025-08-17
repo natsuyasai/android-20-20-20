@@ -22,12 +22,19 @@ import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerState
 import com.example.a20_20_20.domain.TimerStatus
 import kotlin.math.ceil
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class TimerNotificationManager(private val context: Context) {
     
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private var notificationSettings = NotificationSettings.DEFAULT
     private var mediaPlayer: MediaPlayer? = null
+    private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     
     companion object {
         const val CHANNEL_ID = "timer_channel"
@@ -160,9 +167,16 @@ class TimerNotificationManager(private val context: Context) {
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
+            .setTimeoutAfter(2000) // 2秒後に自動削除
             .build()
 
         notificationManager.notify(PHASE_COMPLETION_NOTIFICATION_ID, notification)
+        
+        // 2秒後に通知を手動で削除（確実に削除するため）
+        notificationScope.launch {
+            delay(2000)
+            notificationManager.cancel(PHASE_COMPLETION_NOTIFICATION_ID)
+        }
         
         // 通知音とバイブレーションを再生
         playNotificationSound(completedPhase)
@@ -233,6 +247,7 @@ class TimerNotificationManager(private val context: Context) {
     fun cleanup() {
         mediaPlayer?.release()
         mediaPlayer = null
+        notificationScope.cancel()
     }
 
     fun notify(notificationId: Int, notification: Notification) {
