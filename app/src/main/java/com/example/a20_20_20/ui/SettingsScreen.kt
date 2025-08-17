@@ -2,8 +2,10 @@ package com.example.a20_20_20.ui
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.media.RingtoneManager
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -11,6 +13,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -74,6 +79,11 @@ fun SettingsScreen(
 
     val scrollState = rememberScrollState()
     
+    // Androidの戻るボタンでTimerScreenに戻る
+    BackHandler {
+        onNavigateBack()
+    }
+    
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -84,16 +94,15 @@ fun SettingsScreen(
         // タイトル
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(onClick = onNavigateBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
+            }
             Text(
                 text = "設定",
                 style = MaterialTheme.typography.headlineMedium
             )
-            TextButton(onClick = onNavigateBack) {
-                Text("完了")
-            }
         }
 
         Divider()
