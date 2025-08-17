@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
@@ -34,10 +36,12 @@ import kotlinx.coroutines.launch
 class TimerNotificationManager(private val context: Context) {
     
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private var notificationSettings = NotificationSettings.DEFAULT
     private var mediaPlayer: MediaPlayer? = null
     private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var channelCreated = false
+    private var audioFocusRequest: AudioFocusRequest? = null
     
     companion object {
         const val CHANNEL_ID_SILENT = "timer_channel_silent"
@@ -283,6 +287,74 @@ class TimerNotificationManager(private val context: Context) {
         }
     }
 
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_LOSS,
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                // オーディオフォーカスを失った場合は再生を停止
+                mediaPlayer?.pause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                // 他のアプリの音量を下げて継続再生（Duckingが自動適用される）
+                // MediaPlayerは何もしなくてもシステムが音量を下げる
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                // オーディオフォーカスを回復した場合は再生を再開
+                mediaPlayer?.start()
+            }
+        }
+    }
+
+    private fun requestAudioFocus(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Android 8.0以降のAudioFocusRequest
+            val audioAttributes = when (notificationSettings.soundPlaybackMode) {
+                SoundPlaybackMode.NOTIFICATION -> AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build()
+                SoundPlaybackMode.MUSIC -> AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .build()
+            }
+            
+            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                .setAudioAttributes(audioAttributes)
+                .setAcceptsDelayedFocusGain(false)
+                .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                .build()
+            
+            audioManager.requestAudioFocus(audioFocusRequest!!) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        } else {
+            // Android 7.1以前の古いAPI
+            @Suppress("DEPRECATION")
+            val streamType = when (notificationSettings.soundPlaybackMode) {
+                SoundPlaybackMode.NOTIFICATION -> AudioManager.STREAM_NOTIFICATION
+                SoundPlaybackMode.MUSIC -> AudioManager.STREAM_MUSIC
+            }
+            
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                audioFocusChangeListener,
+                streamType,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+            ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        }
+    }
+
+    private fun releaseAudioFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { request ->
+                audioManager.abandonAudioFocusRequest(request)
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(audioFocusChangeListener)
+        }
+        audioFocusRequest = null
+    }
+
     private fun playNotificationSound(completedPhase: TimerPhase) {
         if (!notificationSettings.enableSound) return
 
@@ -293,6 +365,13 @@ class TimerNotificationManager(private val context: Context) {
 
         try {
             mediaPlayer?.release()
+            
+            // オーディオフォーカスを要求（他のアプリの音量をダッキング）
+            if (!requestAudioFocus()) {
+                // フォーカス取得に失敗した場合でも通知音は再生する
+                android.util.Log.w("TimerNotificationManager", "Audio focus request failed, playing sound anyway")
+            }
+            
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(context, soundUri)
                 
@@ -313,6 +392,8 @@ class TimerNotificationManager(private val context: Context) {
                 setOnCompletionListener { player ->
                     player.release()
                     mediaPlayer = null
+                    // 再生完了後にオーディオフォーカスを解放
+                    releaseAudioFocus()
                 }
                 prepareAsync()
                 setOnPreparedListener { player ->
@@ -322,6 +403,7 @@ class TimerNotificationManager(private val context: Context) {
         } catch (e: Exception) {
             // サウンド再生エラーの場合はログに記録し、続行
             e.printStackTrace()
+            releaseAudioFocus() // エラー時もフォーカスを解放
         }
     }
 
@@ -358,6 +440,7 @@ class TimerNotificationManager(private val context: Context) {
     fun cleanup() {
         mediaPlayer?.release()
         mediaPlayer = null
+        releaseAudioFocus()
         notificationScope.cancel()
     }
 
