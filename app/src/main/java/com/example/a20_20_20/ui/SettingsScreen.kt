@@ -80,6 +80,9 @@ fun SettingsScreen(
     }
 
     val scrollState = rememberScrollState()
+
+    // 文字入力中に画面の表示が見切れないようにする
+    val imeInsets = WindowInsets.ime
     
     // Androidの戻るボタンでTimerScreenに戻る
     BackHandler {
@@ -89,7 +92,8 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(scrollState),
+            .verticalScroll(scrollState)
+            .windowInsetsPadding(imeInsets),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         // タイトル
