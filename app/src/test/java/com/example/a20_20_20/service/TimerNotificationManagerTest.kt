@@ -237,6 +237,48 @@ class TimerNotificationManagerTest {
         // 少なくとも例外なく作成されることを確認
     }
 
+    @Test
+    fun `通知更新間隔の設定が正しく反映されること`() {
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        // 各更新間隔での設定テスト
+        val intervals = listOf(
+            com.example.a20_20_20.domain.NotificationUpdateInterval.EVERY_SECOND,
+            com.example.a20_20_20.domain.NotificationUpdateInterval.EVERY_2_SECONDS,
+            com.example.a20_20_20.domain.NotificationUpdateInterval.EVERY_5_SECONDS,
+            com.example.a20_20_20.domain.NotificationUpdateInterval.EVERY_10_SECONDS
+        )
+        
+        intervals.forEach { interval ->
+            val settings = NotificationSettings(updateInterval = interval)
+            
+            assertDoesNotThrow {
+                notificationManager.updateSettings(settings)
+                val currentSettings = notificationManager.getCurrentNotificationSettings()
+                assertEquals("Update interval should match", interval, currentSettings.updateInterval)
+            }
+        }
+    }
+
+    @Test
+    fun `異なる更新間隔での通知設定が保持されること`() {
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        // 10秒間隔の設定
+        val longIntervalSettings = NotificationSettings(
+            updateInterval = com.example.a20_20_20.domain.NotificationUpdateInterval.EVERY_10_SECONDS,
+            enableSound = false
+        )
+        
+        notificationManager.updateSettings(longIntervalSettings)
+        val retrievedSettings = notificationManager.getCurrentNotificationSettings()
+        
+        assertEquals("Long interval should be preserved", 
+            com.example.a20_20_20.domain.NotificationUpdateInterval.EVERY_10_SECONDS, 
+            retrievedSettings.updateInterval)
+        assertEquals("Sound setting should be preserved", false, retrievedSettings.enableSound)
+    }
+
     private fun assertDoesNotThrow(executable: () -> Unit) {
         try {
             executable()
