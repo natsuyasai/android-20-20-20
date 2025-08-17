@@ -51,28 +51,26 @@ class TimerNotificationManager(private val context: Context) {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val importance = when (notificationSettings.priority) {
-                NotificationPriority.SILENT -> NotificationManager.IMPORTANCE_LOW
-                NotificationPriority.DEFAULT -> NotificationManager.IMPORTANCE_DEFAULT
-            }
-            
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "タイマー通知",
-                importance
-            ).apply {
-                description = "20-20-20タイマーの通知"
-                setShowBadge(false)
-                
-                // サイレントモードの場合は音とバイブレーションを無効化
-                if (notificationSettings.priority == NotificationPriority.SILENT) {
-                    setSound(null, null)
-                    enableVibration(false)
-                }
-            }
-            notificationManager.createNotificationChannel(channel)
+        val importance = when (notificationSettings.priority) {
+            NotificationPriority.SILENT -> NotificationManager.IMPORTANCE_LOW
+            NotificationPriority.DEFAULT -> NotificationManager.IMPORTANCE_DEFAULT
         }
+
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "タイマー通知",
+            importance
+        ).apply {
+            description = "20-20-20タイマーの通知"
+            setShowBadge(false)
+
+            // サイレントモードの場合は音とバイブレーションを無効化
+            if (notificationSettings.priority == NotificationPriority.SILENT) {
+                setSound(null, null)
+                enableVibration(false)
+            }
+        }
+        notificationManager.createNotificationChannel(channel)
     }
     
     private fun updateNotificationChannel() {
@@ -269,13 +267,8 @@ class TimerNotificationManager(private val context: Context) {
 
         if (vibrator.hasVibrator()) {
             val vibrationPattern = longArrayOf(0, 200, 100, 200, 100, 200) // パターン: 待機, バイブ, 停止, バイブ, 停止, バイブ
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createWaveform(vibrationPattern, -1))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(vibrationPattern, -1)
-            }
+
+            vibrator.vibrate(VibrationEffect.createWaveform(vibrationPattern, -1))
         }
     }
 
