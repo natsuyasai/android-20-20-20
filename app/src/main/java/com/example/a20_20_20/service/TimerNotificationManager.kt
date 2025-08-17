@@ -44,11 +44,11 @@ class TimerNotificationManager(private val context: Context) {
     private var audioFocusRequest: AudioFocusRequest? = null
     
     companion object {
-        const val CHANNEL_ID_SILENT = "timer_channel_silent"
-        const val CHANNEL_ID_DEFAULT = "timer_channel_default"
-        const val CHANNEL_ID_COMPLETION = "timer_channel_completion" // フェーズ完了用
-        const val NOTIFICATION_ID = 1
-        const val PHASE_COMPLETION_NOTIFICATION_ID = 2
+        const val CHANNEL_ID_SILENT = "com_example_a20_20_20_timer_channel_silent"
+        const val CHANNEL_ID_DEFAULT = "com_example_a20_20_20_timer_channel_default"
+        const val CHANNEL_ID_COMPLETION = "com_example_a20_20_20_timer_channel_completion" // フェーズ完了用
+        const val NOTIFICATION_ID = 20202001  // アプリ固有のID
+        const val PHASE_COMPLETION_NOTIFICATION_ID = 20202002  // アプリ固有のID
     }
 
     init {
@@ -89,10 +89,16 @@ class TimerNotificationManager(private val context: Context) {
     private fun deleteOldChannelIfExists() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
-                // 古いチャンネルID "timer_channel" を削除
-                notificationManager.deleteNotificationChannel("timer_channel")
+                // 自アプリの古いチャンネルID "timer_channel" のみを削除
+                val existingChannel = notificationManager.getNotificationChannel("timer_channel")
+                if (existingChannel != null) {
+                    // チャンネルが存在する場合のみ削除を実行
+                    notificationManager.deleteNotificationChannel("timer_channel")
+                    android.util.Log.d("TimerNotificationManager", "Deleted old notification channel: timer_channel")
+                }
             } catch (e: Exception) {
                 // 削除に失敗してもクラッシュしないように
+                android.util.Log.w("TimerNotificationManager", "Failed to delete old notification channel", e)
             }
         }
     }
@@ -274,10 +280,11 @@ class TimerNotificationManager(private val context: Context) {
 
         notificationManager.notify(PHASE_COMPLETION_NOTIFICATION_ID, notification)
         
-        // 2秒後に通知を手動で削除（確実に削除するため）
+        // 2秒後に自アプリの特定通知のみを安全に削除
         notificationScope.launch {
             delay(2000)
-            notificationManager.cancel(PHASE_COMPLETION_NOTIFICATION_ID)
+            // 自アプリの特定通知のみを安全に削除
+            cancelOwnNotificationSafely(PHASE_COMPLETION_NOTIFICATION_ID)
         }
         
         // サイレントモード以外の場合のみ通知音とバイブレーションを再生
@@ -445,7 +452,26 @@ class TimerNotificationManager(private val context: Context) {
     }
 
     fun notify(notificationId: Int, notification: Notification) {
-        notificationManager.notify(notificationId, notification)
+        try {
+            notificationManager.notify(notificationId, notification)
+            android.util.Log.d("TimerNotificationManager", "Notification posted with ID: $notificationId")
+        } catch (e: Exception) {
+            android.util.Log.w("TimerNotificationManager", "Failed to post notification with ID: $notificationId", e)
+        }
+    }
+    
+    /**
+     * 自アプリの特定通知のみを安全に削除するヘルパーメソッド
+     */
+    private fun cancelOwnNotificationSafely(notificationId: Int) {
+        try {
+            // 自アプリのパッケージ名をコンテキストから取得して確認
+            val packageName = context.packageName
+            android.util.Log.d("TimerNotificationManager", "Cancelling notification ID: $notificationId for package: $packageName")
+            notificationManager.cancel(notificationId)
+        } catch (e: Exception) {
+            android.util.Log.w("TimerNotificationManager", "Failed to cancel notification ID: $notificationId", e)
+        }
     }
 
     private fun formatTime(timeInMillis: Long): String {
