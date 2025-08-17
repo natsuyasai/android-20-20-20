@@ -1,8 +1,11 @@
 package com.example.a20_20_20.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,7 +23,9 @@ import com.example.a20_20_20.ui.theme._20_20_20Theme
 @Composable
 fun TimerScreen(
     modifier: Modifier = Modifier,
-    viewModel: TimerViewModel = viewModel(factory = TimerViewModelFactory())
+    viewModel: TimerViewModel = viewModel(factory = TimerViewModelFactory()),
+    notificationPermissionDenied: Boolean = false,
+    onRetryPermissionRequest: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val showSettings by viewModel.showSettings.collectAsState()
@@ -40,14 +45,68 @@ fun TimerScreen(
             modifier = modifier
         )
     } else {
-        TimerContent(
-            modifier = modifier,
-            uiState = uiState,
-            onStartClick = { viewModel.startTimer() },
-            onPauseClick = { viewModel.pauseTimer() },
-            onStopClick = { viewModel.stopTimer() },
-            onSettingsClick = { viewModel.navigateToSettings() }
+        Column(modifier = modifier.fillMaxSize()) {
+            // 通知権限拒否メッセージ
+            if (notificationPermissionDenied) {
+                NotificationPermissionBanner(
+                    onRetryClick = onRetryPermissionRequest
+                )
+            }
+            
+            TimerContent(
+                modifier = Modifier.fillMaxSize(),
+                uiState = uiState,
+                onStartClick = { viewModel.startTimer() },
+                onPauseClick = { viewModel.pauseTimer() },
+                onStopClick = { viewModel.stopTimer() },
+                onSettingsClick = { viewModel.navigateToSettings() }
+            )
+        }
+    }
+}
+
+@Composable
+fun NotificationPermissionBanner(
+    onRetryClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clickable { onRetryClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
         )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = "警告",
+                tint = MaterialTheme.colorScheme.onErrorContainer
+            )
+            
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "通知権限が必要です",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Text(
+                    text = "タイマーの通知を表示するために権限が必要です。タップして設定してください。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
     }
 }
 

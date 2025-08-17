@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.example.a20_20_20.ui.TimerScreen
@@ -23,12 +26,12 @@ import com.example.a20_20_20.ui.theme._20_20_20Theme
 
 class MainActivity : ComponentActivity() {
     
+    private var notificationPermissionDenied by mutableStateOf(false)
+    
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (!isGranted) {
-            // 通知権限が拒否された場合の処理（必要に応じて）
-        }
+        notificationPermissionDenied = !isGranted
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,7 +45,9 @@ class MainActivity : ComponentActivity() {
             _20_20_20Theme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     TimerScreen(
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.padding(innerPadding),
+                        notificationPermissionDenied = notificationPermissionDenied,
+                        onRetryPermissionRequest = { requestNotificationPermission() }
                     )
                 }
             }
@@ -50,18 +55,28 @@ class MainActivity : ComponentActivity() {
     }
     
     private fun checkAndRequestPermissions() {
-        // Android 13以降では通知権限が必要
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-        
+        requestNotificationPermission()
         // バッテリー最適化の除外を要求
         requestBatteryOptimizationExemption()
+    }
+    
+    private fun requestNotificationPermission() {
+        // Android 13以降では通知権限が必要
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            if (!hasPermission) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                notificationPermissionDenied = false
+            }
+        } else {
+            // Android 12以前では通知権限は不要
+            notificationPermissionDenied = false
+        }
     }
     
     private fun requestBatteryOptimizationExemption() {
