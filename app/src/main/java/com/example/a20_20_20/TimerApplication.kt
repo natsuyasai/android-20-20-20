@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.TimerSettings
 import com.example.a20_20_20.domain.TimerState
 import com.example.a20_20_20.service.TimerService
@@ -26,6 +27,9 @@ class TimerApplication : Application() {
     
     private val _timerState = MutableStateFlow(TimerState())
     val timerState: StateFlow<TimerState> = _timerState.asStateFlow()
+    
+    private val _notificationSettings = MutableStateFlow(NotificationSettings.DEFAULT)
+    val notificationSettings: StateFlow<NotificationSettings> = _notificationSettings.asStateFlow()
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
@@ -73,6 +77,11 @@ class TimerApplication : Application() {
 
     fun updateSettings(settings: TimerSettings) {
         timerService?.updateTimerSettings(settings)
+    }
+    
+    fun updateNotificationSettings(settings: NotificationSettings) {
+        _notificationSettings.value = settings
+        timerService?.updateNotificationSettings(settings)
     }
 
     fun getService(): TimerService? = timerService
