@@ -8,6 +8,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- バイブレーションのパーミッション -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- バッテリー最適化除外のパーミッション -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- ウェイクロック権限（画面がオフでもタイマーが動作するため） -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:name=".TimerApplication"

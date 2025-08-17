@@ -1,9 +1,11 @@
 package com.example.a20_20_20.service
 
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
+import android.os.PowerManager
 import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerSettings
@@ -21,6 +23,7 @@ class TimerService : Service() {
     private lateinit var notificationManager: TimerNotificationManager
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
+    private var wakeLock: PowerManager.WakeLock? = null
     
     companion object {
         const val ACTION_START_TIMER = "com.example.a20_20_20.START_TIMER"
@@ -32,6 +35,13 @@ class TimerService : Service() {
         super.onCreate()
         timerEngine = TimerEngine()
         notificationManager = TimerNotificationManager(this)
+        
+        // ウェイクロックを取得
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "TimerApp::TimerWakeLock"
+        )
         
         // タイマー状態の変化を監視して通知を更新
         serviceScope.launch {
@@ -50,6 +60,12 @@ class TimerService : Service() {
         super.onDestroy()
         serviceJob.cancel()
         notificationManager.cleanup()
+        // ウェイクロックを解除
+        wakeLock?.let { wl ->
+            if (wl.isHeld) {
+                wl.release()
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -62,6 +78,13 @@ class TimerService : Service() {
     }
 
     private fun startTimer() {
+        // ウェイクロックを取得してタイマーが画面オフでも動作するようにする
+        wakeLock?.let { wl ->
+            if (!wl.isHeld) {
+                wl.acquire(10*60*1000L /*10 minutes*/)
+            }
+        }
+        
         timerEngine.start()
         val notification = notificationManager.createTimerNotification(timerEngine.timerState.value)
         startForeground(TimerNotificationManager.NOTIFICATION_ID, notification)
@@ -73,6 +96,14 @@ class TimerService : Service() {
 
     private fun stopTimer() {
         timerEngine.stop()
+        
+        // ウェイクロックを解除
+        wakeLock?.let { wl ->
+            if (wl.isHeld) {
+                wl.release()
+            }
+        }
+        
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
