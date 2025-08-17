@@ -81,13 +81,34 @@ class TimerService : Service() {
         // ウェイクロックを取得してタイマーが画面オフでも動作するようにする
         wakeLock?.let { wl ->
             if (!wl.isHeld) {
-                wl.acquire(10*60*1000L /*10 minutes*/)
+                // タイマーの残り時間に基づいて適切な時間でウェイクロックを取得
+                val currentState = timerEngine.timerState.value
+                val totalRemainingTime = calculateTotalRemainingTime(currentState)
+                // 最低10分、最大2時間の制限を設ける
+                val wakeLockDuration = totalRemainingTime.coerceIn(10*60*1000L, 2*60*60*1000L)
+                wl.acquire(wakeLockDuration)
             }
         }
         
         timerEngine.start()
         val notification = notificationManager.createTimerNotification(timerEngine.timerState.value)
         startForeground(TimerNotificationManager.NOTIFICATION_ID, notification)
+    }
+    
+    private fun calculateTotalRemainingTime(state: TimerState): Long {
+        // 現在のフェーズの残り時間 + 残りサイクル数に基づく概算時間
+        val currentPhaseRemaining = state.remainingTimeMillis
+        val remainingCycles = if (state.settings.isUnlimitedRepeat()) {
+            // 無制限の場合は1時間分として計算
+            3 // 約1時間分のサイクル
+        } else {
+            // 現在のサイクル番号 = completedCycles + 1（ワークフェーズ）またはcompletedCycles（ブレイクフェーズ）
+            val currentCycle = state.completedCycles + (if (state.currentPhase == TimerPhase.WORK) 1 else 0)
+            state.settings.repeatCount - currentCycle
+        }
+        
+        val cycleTime = state.settings.workDurationMillis + state.settings.breakDurationMillis
+        return currentPhaseRemaining + (remainingCycles * cycleTime)
     }
 
     private fun pauseTimer() {

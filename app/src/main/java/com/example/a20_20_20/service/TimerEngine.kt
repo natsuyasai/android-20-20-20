@@ -19,13 +19,24 @@ class TimerEngine(
 ) {
     private val scope = CoroutineScope(dispatcher)
     private var timerJob: Job? = null
+    private var startTimeMillis: Long = 0L // タイマー開始時のシステム時刻
+    private var pausedTimeMillis: Long = 0L // 一時停止した時間の累計
     
     private val _timerState = MutableStateFlow(TimerState())
     val timerState: StateFlow<TimerState> = _timerState.asStateFlow()
 
     fun start() {
         val currentState = _timerState.value
-        if (currentState.status == TimerStatus.STOPPED || currentState.status == TimerStatus.PAUSED) {
+        if (currentState.status == TimerStatus.STOPPED) {
+            // 新規開始
+            startTimeMillis = System.currentTimeMillis()
+            pausedTimeMillis = 0L
+            _timerState.value = currentState.start()
+            startCountdown()
+        } else if (currentState.status == TimerStatus.PAUSED) {
+            // 再開
+            val pauseStartTime = startTimeMillis + (currentState.settings.workDurationMillis - currentState.remainingTimeMillis) + pausedTimeMillis
+            pausedTimeMillis += System.currentTimeMillis() - pauseStartTime
             _timerState.value = currentState.start()
             startCountdown()
         }
@@ -41,6 +52,8 @@ class TimerEngine(
 
     fun stop() {
         timerJob?.cancel()
+        startTimeMillis = 0L
+        pausedTimeMillis = 0L
         val currentState = _timerState.value
         _timerState.value = currentState.stop()
     }
@@ -59,7 +72,20 @@ class TimerEngine(
                 val currentState = _timerState.value
                 if (currentState.status != TimerStatus.RUNNING) break
                 
-                val newRemainingTime = currentState.remainingTimeMillis - 1000L
+                // システム時刻ベースで経過時間を計算
+                val currentTime = System.currentTimeMillis()
+                val elapsedTime = currentTime - startTimeMillis - pausedTimeMillis
+                
+                // 現在のフェーズの開始時間を計算
+                val phaseStartTime = calculatePhaseStartTime(currentState)
+                val phaseElapsedTime = elapsedTime - phaseStartTime
+                
+                val phaseDuration = when (currentState.currentPhase) {
+                    TimerPhase.WORK -> currentState.settings.workDurationMillis
+                    TimerPhase.BREAK -> currentState.settings.breakDurationMillis
+                }
+                
+                val newRemainingTime = phaseDuration - phaseElapsedTime
                 
                 if (newRemainingTime <= 0) {
                     // フェーズ完了
@@ -71,15 +97,31 @@ class TimerEngine(
             }
         }
     }
+    
+    private fun calculatePhaseStartTime(state: TimerState): Long {
+        // 現在のサイクルまでの累積時間を計算
+        val completedCyclesTime = state.completedCycles * (state.settings.workDurationMillis + state.settings.breakDurationMillis)
+        
+        // 現在のサイクル内でのフェーズ開始時間
+        val currentCyclePhaseTime = when (state.currentPhase) {
+            TimerPhase.WORK -> 0L
+            TimerPhase.BREAK -> state.settings.workDurationMillis
+        }
+        
+        return completedCyclesTime + currentCyclePhaseTime
+    }
 
     private fun handlePhaseCompletion(currentState: TimerState) {
         val nextState = currentState.nextPhase()
         
         if (nextState.isCompleted()) {
             // 全サイクル完了
+            startTimeMillis = 0L
+            pausedTimeMillis = 0L
             _timerState.value = nextState.stop()
         } else {
             // 次のフェーズに移行
+            // システム時刻の調整は不要（calculatePhaseStartTimeで適切に計算される）
             _timerState.value = nextState
         }
     }
