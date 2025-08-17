@@ -87,10 +87,6 @@ class TimerEngine(
                 val currentState = _timerState.value
                 if (currentState.status != TimerStatus.RUNNING) break
                 
-                // 現在のフェーズに応じた適切な更新間隔を計算
-                val updateInterval = calculateOptimalUpdateInterval(currentState)
-                delay(updateInterval)
-                
                 // システム時刻ベースで経過時間を計算
                 val currentTime = System.currentTimeMillis()
                 val elapsedTime = currentTime - startTimeMillis - pausedTimeMillis
@@ -112,6 +108,21 @@ class TimerEngine(
                 } else {
                     // 時間更新
                     _timerState.value = currentState.copy(remainingTimeMillis = newRemainingTime)
+                    
+                    // 次の更新間隔を計算（残り時間が短い場合は短い間隔で更新）
+                    val baseUpdateInterval = calculateOptimalUpdateInterval(currentState)
+                    val nextUpdateInterval = if (newRemainingTime <= 3000) {
+                        // 残り3秒以下の場合は500ms間隔で精密に更新
+                        500L
+                    } else if (newRemainingTime <= 10000) {
+                        // 残り10秒以下の場合は1000ms間隔で更新
+                        1000L
+                    } else {
+                        // それ以外は設定された間隔
+                        baseUpdateInterval
+                    }
+                    
+                    delay(nextUpdateInterval)
                 }
             }
         }
