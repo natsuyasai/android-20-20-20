@@ -148,6 +148,11 @@ class TimerService : Service() {
     private var lastRemainingTime: Long = Long.MAX_VALUE
 
     private fun handlePhaseCompletion(state: TimerState) {
+        // 手動停止の場合は通知しない
+        if (timerEngine.isManuallyStoppedRecently()) {
+            return
+        }
+        
         // フェーズが変わった場合のみ通知音を鳴らす
         if (state.remainingTimeMillis > lastRemainingTime) {
             // 残り時間が増加した = フェーズが変わった

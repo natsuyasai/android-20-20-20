@@ -23,11 +23,13 @@ class TimerEngine(
     private var startTimeMillis: Long = 0L // タイマー開始時のシステム時刻
     private var pausedTimeMillis: Long = 0L // 一時停止した時間の累計
     private var notificationSettings = NotificationSettings.DEFAULT
+    private var isManualStop = false // 手動停止フラグ
     
     private val _timerState = MutableStateFlow(TimerState())
     val timerState: StateFlow<TimerState> = _timerState.asStateFlow()
 
     fun start() {
+        isManualStop = false // タイマー開始時は手動停止フラグをクリア
         val currentState = _timerState.value
         when (currentState.status) {
             TimerStatus.STOPPED -> {
@@ -60,6 +62,7 @@ class TimerEngine(
     }
 
     fun stop() {
+        isManualStop = true // 手動停止フラグを設定
         timerJob?.cancel()
         startTimeMillis = 0L
         pausedTimeMillis = 0L
@@ -78,6 +81,10 @@ class TimerEngine(
         if (_timerState.value.status == TimerStatus.RUNNING) {
             startCountdown()
         }
+    }
+    
+    fun isManuallyStoppedRecently(): Boolean {
+        return isManualStop
     }
 
     private fun startCountdown() {
