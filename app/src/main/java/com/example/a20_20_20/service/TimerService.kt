@@ -78,11 +78,19 @@ class TimerService : Service() {
     }
 
     private fun startTimer() {
+        // 既に実行中の場合は2重起動を防ぐ
+        val currentState = timerEngine.timerState.value
+        if (currentState.status == com.example.a20_20_20.domain.TimerStatus.RUNNING) {
+            // 既に実行中の場合は通知のみ更新
+            val notification = notificationManager.createTimerNotification(currentState)
+            startForeground(TimerNotificationManager.NOTIFICATION_ID, notification)
+            return
+        }
+        
         // ウェイクロックを取得してタイマーが画面オフでも動作するようにする
         wakeLock?.let { wl ->
             if (!wl.isHeld) {
                 // タイマーの残り時間に基づいて適切な時間でウェイクロックを取得
-                val currentState = timerEngine.timerState.value
                 val totalRemainingTime = calculateTotalRemainingTime(currentState)
                 // 最低10分、最大2時間の制限を設ける
                 val wakeLockDuration = totalRemainingTime.coerceIn(10*60*1000L, 2*60*60*1000L)

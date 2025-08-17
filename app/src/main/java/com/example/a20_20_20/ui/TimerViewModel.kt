@@ -42,6 +42,12 @@ class TimerViewModel : ViewModel() {
     }
 
     fun startTimer() {
+        // 2重起動防止: 既に実行中の場合は何もしない
+        val currentState = _uiState.value.timerState
+        if (currentState.status == com.example.a20_20_20.domain.TimerStatus.RUNNING) {
+            return
+        }
+        
         // サービスを明示的に開始してフォアグラウンドにする
         val intent = Intent(application, TimerService::class.java)
         intent.action = TimerService.ACTION_START_TIMER

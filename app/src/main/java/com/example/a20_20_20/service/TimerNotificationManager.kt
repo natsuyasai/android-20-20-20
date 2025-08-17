@@ -87,6 +87,13 @@ class TimerNotificationManager(private val context: Context) {
                     if (silent) {
                         setSound(null, null)
                         enableVibration(false)
+                    } else {
+                        // デフォルト優先度チャンネルの場合は削除不可に設定
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            setAllowBubbles(false)
+                        }
+                        // ロック画面での表示設定
+                        lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                     }
                 }
                 notificationManager.createNotificationChannel(channel)
@@ -129,13 +136,25 @@ class TimerNotificationManager(private val context: Context) {
             TimerStatus.STOPPED -> "停止"
         }
 
+        // デフォルト優先度かつ実行中の場合は常駐・削除不可に設定
+        val isRunningWithDefault = timerState.status == TimerStatus.RUNNING && 
+                                  notificationSettings.priority == NotificationPriority.DEFAULT
+        
         val builder = NotificationCompat.Builder(context, getCurrentChannelId())
             .setContentTitle("$phaseLabel - $statusText")
             .setContentText("残り時間: $formattedTime")
             .setSmallIcon(R.drawable.ic_app_icon)
             .setContentIntent(pendingIntent)
-            .setOngoing(timerState.status == TimerStatus.RUNNING)
-            .setAutoCancel(false)
+            .setOngoing(isRunningWithDefault) // 実行中かつデフォルト優先度の場合は常駐
+            .setAutoCancel(false) // スワイプでの削除を無効化
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // ロック画面でも表示
+            
+        // デフォルト優先度かつ実行中の場合は、より強固な削除防止設定
+        if (isRunningWithDefault) {
+            builder.setOnlyAlertOnce(false) // 更新のたびにアラート
+                   .setPriority(NotificationCompat.PRIORITY_HIGH) // 高優先度
+                   .setCategory(NotificationCompat.CATEGORY_PROGRESS) // 進行状況カテゴリ
+        }
 
         // 状態に応じてアクションボタンを追加
         when (timerState.status) {
