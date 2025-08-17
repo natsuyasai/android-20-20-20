@@ -252,24 +252,30 @@ class TimerService : Service() {
         android.util.Log.d("TimerService", "Starting notification monitoring")
         notificationCheckJob = serviceScope.launch {
             while (true) {
-                delay(3000) // 3秒間隔でチェック
-                
                 val currentState = timerEngine.timerState.value
                 if (currentState.status == com.example.a20_20_20.domain.TimerStatus.STOPPED) {
                     android.util.Log.d("TimerService", "Timer stopped, ending notification monitoring")
                     break
                 }
                 
+                // タイマーの更新間隔と同期して通知存在をチェック
+                val notificationSettings = notificationManager.getCurrentNotificationSettings()
+                val checkInterval = calculateNotificationCheckInterval(notificationSettings.updateInterval.intervalMillis, currentState.remainingTimeMillis)
+                
+                android.util.Log.d("TimerService", "Checking notification with interval: ${checkInterval}ms")
+                delay(checkInterval)
+                
                 // 通知が削除されているかチェック
                 if (!isNotificationVisible()) {
                     val currentTime = System.currentTimeMillis()
-                    // 最後の復元から5秒以上経過している場合のみ復元（連続復元を防ぐ）
-                    if (currentTime - lastRestoreTime > 5000) {
+                    // 最後の復元から更新間隔の2倍以上経過している場合のみ復元（連続復元を防ぐ）
+                    val cooldownPeriod = notificationSettings.updateInterval.intervalMillis * 2
+                    if (currentTime - lastRestoreTime > cooldownPeriod) {
                         android.util.Log.w("TimerService", "Notification was dismissed by user, restoring...")
                         restoreNotification()
                         lastRestoreTime = currentTime
                     } else {
-                        android.util.Log.d("TimerService", "Notification restore skipped due to rate limiting")
+                        android.util.Log.d("TimerService", "Notification restore skipped due to rate limiting (cooldown: ${cooldownPeriod}ms)")
                     }
                 }
             }
@@ -282,14 +288,25 @@ class TimerService : Service() {
         android.util.Log.d("TimerService", "Stopped notification monitoring")
     }
     
+    private fun calculateNotificationCheckInterval(baseInterval: Long, remainingTimeMillis: Long): Long {
+        return when {
+            // 残り時間が3秒以下の場合は500ms間隔で高頻度チェック
+            remainingTimeMillis <= 3000 -> 500L
+            // 残り時間が10秒以下の場合は1秒間隔でチェック
+            remainingTimeMillis <= 10000 -> 1000L
+            // それ以外はタイマーの更新間隔と同じ頻度でチェック
+            else -> baseInterval
+        }
+    }
+    
     private fun isNotificationVisible(): Boolean {
         return try {
             // NotificationManagerから自アプリの通知を確認
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            val systemNotificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
             
             // Android 6.0以降では、アクティブな通知を確認できる
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                val activeNotifications: Array<StatusBarNotification> = notificationManager.activeNotifications
+                val activeNotifications: Array<StatusBarNotification> = systemNotificationManager.activeNotifications
                 val hasTimerNotification = activeNotifications.any { notification ->
                     notification.id == TimerNotificationManager.NOTIFICATION_ID
                 }
