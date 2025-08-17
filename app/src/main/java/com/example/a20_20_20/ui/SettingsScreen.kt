@@ -1,20 +1,30 @@
 package com.example.a20_20_20.ui
 
+import android.app.Activity
+import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.TimerSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     currentSettings: TimerSettings,
+    currentNotificationSettings: NotificationSettings = NotificationSettings.DEFAULT,
     onSettingsChanged: (TimerSettings) -> Unit,
+    onNotificationSettingsChanged: (NotificationSettings) -> Unit = {},
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -29,6 +39,34 @@ fun SettingsScreen(
     }
     var isUnlimited by remember { 
         mutableStateOf(currentSettings.isUnlimitedRepeat()) 
+    }
+    
+    // 通知設定の状態
+    var enableSound by remember { mutableStateOf(currentNotificationSettings.enableSound) }
+    var enableVibration by remember { mutableStateOf(currentNotificationSettings.enableVibration) }
+    var soundVolume by remember { mutableFloatStateOf(currentNotificationSettings.soundVolume) }
+    var workCompleteSound by remember { mutableStateOf(currentNotificationSettings.workCompleteSound) }
+    var breakCompleteSound by remember { mutableStateOf(currentNotificationSettings.breakCompleteSound) }
+    
+    val context = LocalContext.current
+    
+    // 通知音選択用ランチャー
+    val workSoundLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            workCompleteSound = uri
+        }
+    }
+    
+    val breakSoundLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            breakCompleteSound = uri
+        }
     }
 
     Column(
@@ -172,6 +210,92 @@ fun SettingsScreen(
             }
         }
 
+        // 通知設定
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "通知設定",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // サウンド有効/無効
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = enableSound,
+                        onCheckedChange = { enableSound = it }
+                    )
+                    Text("通知音を有効にする")
+                }
+                
+                if (enableSound) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // 音量調整
+                    Text("音量: ${(soundVolume * 100).toInt()}%")
+                    Slider(
+                        value = soundVolume,
+                        onValueChange = { soundVolume = it },
+                        valueRange = 0f..1f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // ワーク完了音選択
+                    Button(
+                        onClick = {
+                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "ワーク完了音を選択")
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, workCompleteSound)
+                            }
+                            workSoundLauncher.launch(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("ワーク完了音を選択")
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // ブレイク完了音選択
+                    Button(
+                        onClick = {
+                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "ブレイク完了音を選択")
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, breakCompleteSound)
+                            }
+                            breakSoundLauncher.launch(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("ブレイク完了音を選択")
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // バイブレーション設定
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = enableVibration,
+                        onCheckedChange = { enableVibration = it }
+                    )
+                    Text("バイブレーションを有効にする")
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.weight(1f))
 
         // 保存ボタン
@@ -182,7 +306,15 @@ fun SettingsScreen(
                     breakDurationMillis = breakSeconds * 1000L,
                     repeatCount = if (isUnlimited) TimerSettings.UNLIMITED_REPEAT else repeatCount
                 )
+                val newNotificationSettings = NotificationSettings(
+                    workCompleteSound = workCompleteSound,
+                    breakCompleteSound = breakCompleteSound,
+                    enableSound = enableSound,
+                    enableVibration = enableVibration,
+                    soundVolume = soundVolume
+                )
                 onSettingsChanged(newSettings)
+                onNotificationSettingsChanged(newNotificationSettings)
                 onNavigateBack()
             },
             modifier = Modifier.fillMaxWidth()

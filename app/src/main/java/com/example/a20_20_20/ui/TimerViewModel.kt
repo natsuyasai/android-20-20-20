@@ -1,9 +1,12 @@
 package com.example.a20_20_20.ui
 
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.a20_20_20.TimerApplication
+import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.TimerSettings
+import com.example.a20_20_20.service.TimerService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +21,8 @@ class TimerViewModel : ViewModel() {
     
     private val _showSettings = MutableStateFlow(false)
     val showSettings: StateFlow<Boolean> = _showSettings.asStateFlow()
+    
+    val notificationSettings: StateFlow<NotificationSettings> = application.notificationSettings
 
     init {
         // アプリケーションからタイマー状態を監視
@@ -36,7 +41,10 @@ class TimerViewModel : ViewModel() {
     }
 
     fun startTimer() {
-        application.startTimer()
+        // サービスを明示的に開始してフォアグラウンドにする
+        val intent = Intent(application, TimerService::class.java)
+        intent.action = TimerService.ACTION_START_TIMER
+        application.startForegroundService(intent)
     }
 
     fun pauseTimer() {
@@ -49,6 +57,10 @@ class TimerViewModel : ViewModel() {
 
     fun updateSettings(settings: TimerSettings) {
         application.updateSettings(settings)
+    }
+    
+    fun updateNotificationSettings(settings: NotificationSettings) {
+        application.updateNotificationSettings(settings)
     }
 
     fun navigateToSettings() {

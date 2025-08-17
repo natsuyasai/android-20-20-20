@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
+import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerSettings
 import com.example.a20_20_20.domain.TimerState
@@ -77,8 +78,10 @@ class TimerService : Service() {
     }
 
     private fun updateNotification(state: TimerState) {
-        val notification = notificationManager.createTimerNotification(state)
-        notificationManager.notify(TimerNotificationManager.NOTIFICATION_ID, notification)
+        if (state.status != com.example.a20_20_20.domain.TimerStatus.STOPPED) {
+            val notification = notificationManager.createTimerNotification(state)
+            notificationManager.notify(TimerNotificationManager.NOTIFICATION_ID, notification)
+        }
     }
 
     private var lastCompletedPhase: TimerPhase? = null
@@ -105,6 +108,10 @@ class TimerService : Service() {
     
     fun updateTimerSettings(settings: TimerSettings) {
         timerEngine.updateSettings(settings)
+    }
+    
+    fun updateNotificationSettings(settings: NotificationSettings) {
+        notificationManager.updateSettings(settings)
     }
     
     fun startTimerEngine() {

@@ -226,7 +226,7 @@ class TimerNotificationManager(private val context: Context) {
         }
     }
 
-    fun updateNotificationSettings(settings: NotificationSettings) {
+    fun updateSettings(settings: NotificationSettings) {
         notificationSettings = settings
     }
 
