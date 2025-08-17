@@ -36,7 +36,7 @@ class TimerService : Service() {
         timerEngine = TimerEngine()
         notificationManager = TimerNotificationManager(this)
         
-        // ウェイクロックを取得
+        // ウェイクロックを取得（画面OFFを許容するPARTIAL_WAKE_LOCK）
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
@@ -172,6 +172,7 @@ class TimerService : Service() {
     
     fun updateNotificationSettings(settings: NotificationSettings) {
         notificationManager.updateSettings(settings)
+        timerEngine.updateNotificationSettings(settings)
     }
     
     fun startTimerEngine() {

@@ -42,6 +42,7 @@ class TimerNotificationManager(private val context: Context) {
     companion object {
         const val CHANNEL_ID_SILENT = "timer_channel_silent"
         const val CHANNEL_ID_DEFAULT = "timer_channel_default"
+        const val CHANNEL_ID_COMPLETION = "timer_channel_completion" // フェーズ完了用
         const val NOTIFICATION_ID = 1
         const val PHASE_COMPLETION_NOTIFICATION_ID = 2
     }
@@ -55,9 +56,30 @@ class TimerNotificationManager(private val context: Context) {
         // 古いチャンネルがあれば削除
         deleteOldChannelIfExists()
         
-        // 両方のチャンネルを作成（必要に応じて）
+        // 通知チャンネルを作成（必要に応じて）
         createChannelIfNotExists(CHANNEL_ID_SILENT, "タイマー通知（サイレント）", NotificationManager.IMPORTANCE_LOW, true)
         createChannelIfNotExists(CHANNEL_ID_DEFAULT, "タイマー通知（デフォルト）", NotificationManager.IMPORTANCE_DEFAULT, false)
+        createCompletionChannelIfNotExists()
+    }
+    
+    private fun createCompletionChannelIfNotExists() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val existingChannel = notificationManager.getNotificationChannel(CHANNEL_ID_COMPLETION)
+            if (existingChannel == null) {
+                val channel = NotificationChannel(
+                    CHANNEL_ID_COMPLETION,
+                    "フェーズ完了通知",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "ワーク・ブレイク完了時の通知"
+                    setShowBadge(false)
+                    // フェーズ完了時はバイブレーションと音を有効
+                    enableVibration(true)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+        }
     }
     
     private fun deleteOldChannelIfExists() {
@@ -94,6 +116,8 @@ class TimerNotificationManager(private val context: Context) {
                         }
                         // ロック画面での表示設定
                         lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                        // 進行状況通知ではバイブレーションを抑制
+                        enableVibration(false)
                     }
                 }
                 notificationManager.createNotificationChannel(channel)
@@ -151,7 +175,7 @@ class TimerNotificationManager(private val context: Context) {
             
         // デフォルト優先度かつ実行中の場合は、より強固な削除防止設定
         if (isRunningWithDefault) {
-            builder.setOnlyAlertOnce(false) // 更新のたびにアラート
+            builder.setOnlyAlertOnce(true) // 最初の1回のみアラート（バイブレーション防止）
                    .setPriority(NotificationCompat.PRIORITY_HIGH) // 高優先度
                    .setCategory(NotificationCompat.CATEGORY_PROGRESS) // 進行状況カテゴリ
         }
@@ -235,7 +259,7 @@ class TimerNotificationManager(private val context: Context) {
             NotificationPriority.DEFAULT -> NotificationCompat.PRIORITY_HIGH
         }
         
-        val notification = NotificationCompat.Builder(context, getCurrentChannelId())
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID_COMPLETION)
             .setContentTitle("フェーズ完了")
             .setContentText(message)
             .setSmallIcon(R.drawable.ic_app_icon)

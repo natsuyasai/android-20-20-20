@@ -10,6 +10,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -22,11 +24,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import android.content.res.Configuration
 import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.NotificationPriority
+import com.example.a20_20_20.domain.NotificationUpdateInterval
 import com.example.a20_20_20.domain.SoundPlaybackMode
 import com.example.a20_20_20.domain.TimerSettings
+import com.example.a20_20_20.ui.theme._20_20_20Theme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +65,7 @@ fun SettingsScreen(
     var breakCompleteSound by remember { mutableStateOf(currentNotificationSettings.breakCompleteSound) }
     var soundPlaybackMode by remember { mutableStateOf(currentNotificationSettings.soundPlaybackMode) }
     var notificationPriority by remember { mutableStateOf(currentNotificationSettings.priority) }
+    var updateInterval by remember { mutableStateOf(currentNotificationSettings.updateInterval) }
     
     val context = LocalContext.current
     
@@ -268,6 +275,23 @@ fun SettingsScreen(
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
+                // 通知更新間隔設定
+                Text("通知の更新間隔")
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(NotificationUpdateInterval.values()) { interval ->
+                        FilterChip(
+                            selected = updateInterval == interval,
+                            onClick = { updateInterval = interval },
+                            label = { Text(interval.displayName) }
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
                 // サウンド有効/無効
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -382,7 +406,8 @@ fun SettingsScreen(
                     enableVibration = enableVibration,
                     soundVolume = soundVolume,
                     soundPlaybackMode = soundPlaybackMode,
-                    priority = notificationPriority
+                    priority = notificationPriority,
+                    updateInterval = updateInterval
                 )
                 onSettingsChanged(newSettings)
                 onNotificationSettingsChanged(newNotificationSettings)
@@ -392,5 +417,63 @@ fun SettingsScreen(
         ) {
             Text("設定を保存")
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SettingsScreenPreview() {
+    _20_20_20Theme {
+        SettingsScreen(
+            currentSettings = TimerSettings(
+                workDurationMillis = 20 * 60 * 1000L, // 20分
+                breakDurationMillis = 20 * 1000L,     // 20秒
+                repeatCount = 5
+            ),
+            currentNotificationSettings = NotificationSettings(
+                workCompleteSound = null,
+                breakCompleteSound = null,
+                enableSound = true,
+                enableVibration = true,
+                soundVolume = 0.8f,
+                soundPlaybackMode = SoundPlaybackMode.NOTIFICATION,
+                priority = NotificationPriority.DEFAULT,
+                updateInterval = NotificationUpdateInterval.EVERY_5_SECONDS
+            ),
+            onSettingsChanged = { /* Preview用のダミー関数 */ },
+            onNotificationSettingsChanged = { /* Preview用のダミー関数 */ },
+            onNavigateBack = { /* Preview用のダミー関数 */ }
+        )
+    }
+}
+
+@Preview(
+    name = "Dark Theme",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+fun SettingsScreenDarkPreview() {
+    _20_20_20Theme {
+        SettingsScreen(
+            currentSettings = TimerSettings(
+                workDurationMillis = 25 * 60 * 1000L, // 25分
+                breakDurationMillis = 5 * 60 * 1000L,  // 5分
+                repeatCount = TimerSettings.UNLIMITED_REPEAT
+            ),
+            currentNotificationSettings = NotificationSettings(
+                workCompleteSound = null,
+                breakCompleteSound = null,
+                enableSound = false,
+                enableVibration = false,
+                soundVolume = 0.5f,
+                soundPlaybackMode = SoundPlaybackMode.MUSIC,
+                priority = NotificationPriority.SILENT,
+                updateInterval = NotificationUpdateInterval.EVERY_30_SECONDS
+            ),
+            onSettingsChanged = { /* Preview用のダミー関数 */ },
+            onNotificationSettingsChanged = { /* Preview用のダミー関数 */ },
+            onNavigateBack = { /* Preview用のダミー関数 */ }
+        )
     }
 }

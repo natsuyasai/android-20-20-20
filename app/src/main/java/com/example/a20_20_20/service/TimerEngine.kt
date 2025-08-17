@@ -1,5 +1,6 @@
 package com.example.a20_20_20.service
 
+import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerSettings
 import com.example.a20_20_20.domain.TimerState
@@ -21,6 +22,7 @@ class TimerEngine(
     private var timerJob: Job? = null
     private var startTimeMillis: Long = 0L // タイマー開始時のシステム時刻
     private var pausedTimeMillis: Long = 0L // 一時停止した時間の累計
+    private var notificationSettings = NotificationSettings.DEFAULT
     
     private val _timerState = MutableStateFlow(TimerState())
     val timerState: StateFlow<TimerState> = _timerState.asStateFlow()
@@ -69,15 +71,25 @@ class TimerEngine(
         stop()
         _timerState.value = TimerState(settings = settings)
     }
+    
+    fun updateNotificationSettings(settings: NotificationSettings) {
+        notificationSettings = settings
+        // 実行中の場合は更新間隔を反映するためにカウントダウンを再開
+        if (_timerState.value.status == TimerStatus.RUNNING) {
+            startCountdown()
+        }
+    }
 
     private fun startCountdown() {
         timerJob?.cancel()
         timerJob = scope.launch {
             while (_timerState.value.status == TimerStatus.RUNNING) {
-                delay(1000L) // 1秒間隔で更新
-                
                 val currentState = _timerState.value
                 if (currentState.status != TimerStatus.RUNNING) break
+                
+                // 現在のフェーズに応じた適切な更新間隔を計算
+                val updateInterval = calculateOptimalUpdateInterval(currentState)
+                delay(updateInterval)
                 
                 // システム時刻ベースで経過時間を計算
                 val currentTime = System.currentTimeMillis()
@@ -103,6 +115,22 @@ class TimerEngine(
                 }
             }
         }
+    }
+    
+    private fun calculateOptimalUpdateInterval(state: TimerState): Long {
+        val baseInterval = notificationSettings.updateInterval.intervalMillis
+        
+        // ブレイクフェーズの場合のみ特別処理
+        if (state.currentPhase == TimerPhase.BREAK) {
+            val breakDuration = state.settings.breakDurationMillis
+            
+            // 更新間隔がブレイク時間より長い場合はブレイク時間を使用
+            if (baseInterval > breakDuration) {
+                return breakDuration
+            }
+        }
+        
+        return baseInterval
     }
     
     private fun calculatePhaseStartTime(state: TimerState): Long {
