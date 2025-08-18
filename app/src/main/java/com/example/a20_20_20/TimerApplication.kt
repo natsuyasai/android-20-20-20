@@ -1,10 +1,12 @@
 package com.example.a20_20_20
 
+import android.app.AlarmManager
 import android.app.Application
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Build
 import android.os.IBinder
 import com.example.a20_20_20.data.SettingsRepository
 import com.example.a20_20_20.domain.NotificationSettings
@@ -35,6 +37,9 @@ class TimerApplication : Application() {
     
     private val _timerSettings = MutableStateFlow<TimerSettings>(TimerSettings.DEFAULT)
     val timerSettings: StateFlow<TimerSettings> = _timerSettings.asStateFlow()
+    
+    private val _exactAlarmPermissionGranted = MutableStateFlow(false)
+    val exactAlarmPermissionGranted: StateFlow<Boolean> = _exactAlarmPermissionGranted.asStateFlow()
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
@@ -69,6 +74,9 @@ class TimerApplication : Application() {
         
         // 保存された設定を読み込み
         loadSettings()
+        
+        // 権限状態をチェック
+        checkExactAlarmPermission()
         
         bindToTimerService()
     }
@@ -130,5 +138,19 @@ class TimerApplication : Application() {
         fun getInstance(): TimerApplication {
             return instance ?: throw IllegalStateException("Application not initialized")
         }
+    }
+    
+    private fun checkExactAlarmPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            _exactAlarmPermissionGranted.value = alarmManager.canScheduleExactAlarms()
+        } else {
+            // Android 11以前では権限不要
+            _exactAlarmPermissionGranted.value = true
+        }
+    }
+    
+    fun updateExactAlarmPermissionState() {
+        checkExactAlarmPermission()
     }
 }

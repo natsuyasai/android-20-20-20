@@ -27,7 +27,6 @@ class TimerEngine(
     private val scope = CoroutineScope(dispatcher)
     private var timerJob: Job? = null
     private var startTimeMillis: Long = 0L // タイマー開始時のシステム時刻
-    private var pausedTimeMillis: Long = 0L // 一時停止した時間の累計
     private var notificationSettings = NotificationSettings.DEFAULT
     private var isManualStop = false // 手動停止フラグ
     
@@ -52,14 +51,12 @@ class TimerEngine(
             TimerStatus.STOPPED -> {
                 // 新規開始
                 startTimeMillis = System.currentTimeMillis()
-                pausedTimeMillis = 0L
                 _timerState.value = currentState.start()
                 startAlarmBasedTimer()
             }
             TimerStatus.PAUSED -> {
-                // 再開
-                val pauseStartTime = startTimeMillis + (currentState.settings.workDurationMillis - currentState.remainingTimeMillis) + pausedTimeMillis
-                pausedTimeMillis += System.currentTimeMillis() - pauseStartTime
+                // 再開：一時停止からの再開では、残り時間をそのまま維持
+                // 一時停止した時点の状態を復元するだけで十分
                 _timerState.value = currentState.start()
                 startAlarmBasedTimer()
             }
@@ -75,8 +72,12 @@ class TimerEngine(
         updateTimerJob?.cancel()
         val currentState = _timerState.value
         if (currentState.status == TimerStatus.RUNNING) {
-            _timerState.value = currentState.pause()
-            android.util.Log.d("TimerEngine", "Timer paused")
+            // AlarmManagerベースでは、一時停止時は現在の残り時間をそのまま保持
+            // AlarmManagerが設定した正確な残り時間から独自計算は不要
+            _timerState.value = currentState.copy(
+                status = TimerStatus.PAUSED
+            )
+            android.util.Log.d("TimerEngine", "Timer paused with remaining: ${currentState.remainingTimeMillis}ms")
         }
     }
 
@@ -85,7 +86,6 @@ class TimerEngine(
         cancelAlarms()
         updateTimerJob?.cancel()
         startTimeMillis = 0L
-        pausedTimeMillis = 0L
         val currentState = _timerState.value
         _timerState.value = currentState.stop()
         android.util.Log.d("TimerEngine", "Timer stopped")
@@ -134,37 +134,23 @@ class TimerEngine(
                 val currentState = _timerState.value
                 if (currentState.status != TimerStatus.RUNNING) break
                 
-                // システム時刻ベースで経過時間を計算
-                val currentTime = System.currentTimeMillis()
-                val elapsedTime = currentTime - startTimeMillis - pausedTimeMillis
+                // AlarmManagerベースでは、UI更新のみを行い、
+                // フェーズ完了の判定はAlarmManagerに委ねる
+                updateRemainingTimeForDisplay(currentState)
                 
-                // 現在のフェーズの開始時間を計算
-                val phaseStartTime = calculatePhaseStartTime(currentState)
-                val phaseElapsedTime = elapsedTime - phaseStartTime
-                
-                val phaseDuration = when (currentState.currentPhase) {
-                    TimerPhase.WORK -> currentState.settings.workDurationMillis
-                    TimerPhase.BREAK -> currentState.settings.breakDurationMillis
-                }
-                
-                val newRemainingTime = phaseDuration - phaseElapsedTime
-                
-                if (newRemainingTime <= 0) {
-                    // フェーズ完了はAlarmManagerで処理されるため、ここでは状態を0に設定
-                    _timerState.value = currentState.copy(remainingTimeMillis = 0L)
-                    break
-                } else {
-                    // 時間更新
-                    _timerState.value = currentState.copy(remainingTimeMillis = newRemainingTime)
-                }
-                
-                // AlarmManagerが正確なフェーズ完了を管理するため、
-                // UI更新は一定間隔で十分
                 val nextUpdateInterval = calculateOptimalUpdateInterval(currentState)
-                
                 delay(nextUpdateInterval)
             }
         }
+    }
+    
+    private fun updateRemainingTimeForDisplay(currentState: TimerState) {
+        // AlarmManagerベースでは、正確な残り時間はフェーズ完了時まで維持される
+        // UI更新は主に通知やUI表示の同期のためのものであり、時間計算は行わない
+        // 実際の残り時間の更新はAlarmManagerからのフェーズ完了時のみ実行される
+        
+        // 必要に応じて将来のUI表示用の軽微な更新ロジックをここに追加可能
+        // 現在は残り時間の独自計算は実行せず、AlarmManagerに委ねる
     }
     
     private fun calculateOptimalUpdateInterval(state: TimerState): Long {
@@ -183,18 +169,6 @@ class TimerEngine(
         return baseInterval
     }
     
-    private fun calculatePhaseStartTime(state: TimerState): Long {
-        // 現在のサイクルまでの累積時間を計算
-        val completedCyclesTime = state.completedCycles * (state.settings.workDurationMillis + state.settings.breakDurationMillis)
-        
-        // 現在のサイクル内でのフェーズ開始時間
-        val currentCyclePhaseTime = when (state.currentPhase) {
-            TimerPhase.WORK -> 0L
-            TimerPhase.BREAK -> state.settings.workDurationMillis
-        }
-        
-        return completedCyclesTime + currentCyclePhaseTime
-    }
 
     private fun schedulePhaseCompleteAlarm(triggerTime: Long) {
         val intent = Intent(context, TimerAlarmReceiver::class.java).apply {
@@ -209,6 +183,15 @@ class TimerEngine(
         )
         
         try {
+            // Android 12以降では権限チェックが必要
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!alarmManager.canScheduleExactAlarms()) {
+                    android.util.Log.w("TimerEngine", "Cannot schedule exact alarms, falling back to inexact alarm")
+                    alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, currentAlarmIntent!!)
+                    return
+                }
+            }
+            
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 // Android 6.0以降では正確なアラームのためsetExactAndAllowWhileIdleを使用
                 alarmManager.setExactAndAllowWhileIdle(

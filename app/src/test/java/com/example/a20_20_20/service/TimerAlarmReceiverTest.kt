@@ -8,6 +8,7 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
+import org.mockito.kotlin.doNothing
 
 class TimerAlarmReceiverTest {
 
@@ -16,13 +17,11 @@ class TimerAlarmReceiverTest {
 
     @Test
     fun `フェーズ完了アクションを受信した場合にTimerServiceが開始される`() {
-        // フェーズ完了のインテント
-        val intent = Intent().apply {
-            action = TimerEngine.ACTION_PHASE_COMPLETE
-        }
+        // テスト環境ではIntentが適切にモックされないため、基本的な動作のみテスト
+        val intent = mock<Intent>()
+        whenever(intent.action).thenReturn(TimerEngine.ACTION_PHASE_COMPLETE)
 
-        // receiveメソッドを呼び出し
-        // 実際のテストではstartForegroundServiceの呼び出しを検証
+        // receiveメソッドを呼び出し（例外が発生しないことを確認）
         assertDoesNotThrow {
             receiver.onReceive(mockContext, intent)
         }
@@ -30,9 +29,8 @@ class TimerAlarmReceiverTest {
 
     @Test
     fun `タイマーティックアクションを受信した場合に正常に処理される`() {
-        val intent = Intent().apply {
-            action = TimerEngine.ACTION_TIMER_TICK
-        }
+        val intent = mock<Intent>()
+        whenever(intent.action).thenReturn(TimerEngine.ACTION_TIMER_TICK)
 
         assertDoesNotThrow {
             receiver.onReceive(mockContext, intent)
@@ -41,9 +39,8 @@ class TimerAlarmReceiverTest {
 
     @Test
     fun `未知のアクションを受信した場合でも例外が発生しない`() {
-        val intent = Intent().apply {
-            action = "unknown_action"
-        }
+        val intent = mock<Intent>()
+        whenever(intent.action).thenReturn("unknown_action")
 
         assertDoesNotThrow {
             receiver.onReceive(mockContext, intent)
@@ -52,12 +49,10 @@ class TimerAlarmReceiverTest {
 
     @Test
     fun `フェーズ完了処理でTimerServiceの正しいアクションが設定される`() {
-        val intent = Intent().apply {
-            action = TimerEngine.ACTION_PHASE_COMPLETE
-        }
+        val intent = mock<Intent>()
+        whenever(intent.action).thenReturn(TimerEngine.ACTION_PHASE_COMPLETE)
 
         // BroadcastReceiverの動作を検証
-        // 実際の実装では、TimerServiceに対して正しいアクションでインテントが送信されることを確認
         assertDoesNotThrow {
             receiver.onReceive(mockContext, intent)
         }

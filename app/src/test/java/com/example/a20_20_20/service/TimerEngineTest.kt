@@ -1,5 +1,6 @@
 package com.example.a20_20_20.service
 
+import android.app.AlarmManager
 import android.content.Context
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerSettings
@@ -12,16 +13,16 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.Assert.*
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimerEngineTest {
 
     private val testDispatcher = StandardTestDispatcher()
-    private val mockContext = mock<Context>()
 
     @Test
     fun `初期状態でタイマーが停止状態`() = runTest(testDispatcher) {
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         val state = engine.timerState.value
         
         assertEquals(TimerStatus.STOPPED, state.status)
@@ -30,7 +31,7 @@ class TimerEngineTest {
 
     @Test
     fun `タイマー開始時に実行中状態になる`() = runTest(testDispatcher) {
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         
         engine.start()
         val state = engine.timerState.value
@@ -41,7 +42,7 @@ class TimerEngineTest {
     @Test
     fun `タイマー停止時に初期状態にリセット`() = runTest(testDispatcher) {
         val settings = TimerSettings(workDurationMillis = 60000L)
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         
         engine.updateSettings(settings)
         engine.start()
@@ -56,7 +57,7 @@ class TimerEngineTest {
 
     @Test
     fun `タイマー一時停止時に一時停止状態になる`() = runTest(testDispatcher) {
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         
         engine.start()
         engine.pause()
@@ -72,7 +73,7 @@ class TimerEngineTest {
             breakDurationMillis = 30000L,  // 30秒
             repeatCount = 5
         )
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         
         engine.updateSettings(customSettings)
         val state = engine.timerState.value
@@ -84,7 +85,7 @@ class TimerEngineTest {
     @Test
     fun `時間経過時に残り時間が減少する`() = runTest(testDispatcher) {
         val settings = TimerSettings(workDurationMillis = 5000L) // 5秒
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         
         engine.updateSettings(settings)
         engine.start()
@@ -103,7 +104,7 @@ class TimerEngineTest {
             workDurationMillis = 1000L, // 1秒
             breakDurationMillis = 2000L  // 2秒
         )
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         
         engine.updateSettings(settings)
         engine.start()
@@ -123,7 +124,7 @@ class TimerEngineTest {
             workDurationMillis = 1000L, // 1秒  
             breakDurationMillis = 1000L  // 1秒
         )
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         
         engine.updateSettings(settings)
         engine.start()
@@ -145,7 +146,7 @@ class TimerEngineTest {
             breakDurationMillis = 1000L, // 1秒
             repeatCount = 1 // 1サイクルのみ
         )
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         
         engine.updateSettings(settings)
         engine.start()
@@ -161,7 +162,7 @@ class TimerEngineTest {
 
     @Test
     fun `AlarmManagerベースでのフェーズ完了処理が正しく動作する`() = runTest(testDispatcher) {
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         
         // ワークフェーズで開始
         engine.start()
@@ -178,7 +179,7 @@ class TimerEngineTest {
 
     @Test
     fun `手動停止フラグが正しく設定される`() = runTest(testDispatcher) {
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         
         engine.start()
         assertFalse("開始時は手動停止フラグがfalse", engine.isManuallyStoppedRecently())
@@ -189,7 +190,7 @@ class TimerEngineTest {
 
     @Test
     fun `一時停止と再開が正しく動作する`() = runTest(testDispatcher) {
-        val engine = TimerEngine(mockContext, testDispatcher)
+        val engine = TimerEngine(mock(), testDispatcher)
         
         engine.start()
         assertEquals(TimerStatus.RUNNING, engine.timerState.value.status)

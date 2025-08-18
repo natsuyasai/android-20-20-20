@@ -25,8 +25,11 @@ fun TimerScreen(
     modifier: Modifier = Modifier,
     viewModel: TimerViewModel = viewModel(factory = TimerViewModelFactory()),
     notificationPermissionDenied: Boolean = false,
+    exactAlarmPermissionDenied: Boolean = false,
     onRetryPermissionRequest: () -> Unit = {},
-    onOpenSettings: () -> Unit = {}
+    onOpenSettings: () -> Unit = {},
+    onRetryExactAlarmPermission: () -> Unit = {},
+    onOpenAlarmSettings: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val showSettings by viewModel.showSettings.collectAsState()
@@ -53,6 +56,14 @@ fun TimerScreen(
                 NotificationPermissionBanner(
                     onRetryClick = onRetryPermissionRequest,
                     onOpenSettingsClick = onOpenSettings
+                )
+            }
+            
+            // 正確なアラーム権限拒否メッセージ
+            if (exactAlarmPermissionDenied) {
+                ExactAlarmPermissionBanner(
+                    onRetryClick = onRetryExactAlarmPermission,
+                    onOpenSettingsClick = onOpenAlarmSettings
                 )
             }
             
@@ -264,6 +275,87 @@ fun TimerControls(
                     )
                 ) {
                     Text("停止")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ExactAlarmPermissionBanner(
+    onRetryClick: () -> Unit,
+    onOpenSettingsClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "正確なアラーム権限が必要です",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = "20-20-20タイマーが正確に動作するために、アラーム権限を許可してください。この権限により、バックグラウンドでも正確なタイミングで通知を表示できます。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = "手順:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = "設定 → アプリ → 特別なアプリアクセス → アラームとリマインダー",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(onClick = onRetryClick) {
+                    Text(
+                        text = "アラーム権限設定",
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+                TextButton(onClick = onOpenSettingsClick) {
+                    Text(
+                        text = "手動で設定",
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
                 }
             }
         }
