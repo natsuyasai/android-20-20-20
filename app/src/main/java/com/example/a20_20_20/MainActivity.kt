@@ -1,6 +1,8 @@
 package com.example.a20_20_20
 
 import android.Manifest
+import android.app.AlarmManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -9,6 +11,7 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -30,11 +33,12 @@ import com.example.a20_20_20.ui.theme._20_20_20Theme
 class MainActivity : ComponentActivity() {
     
     private var notificationPermissionDenied by mutableStateOf(false)
+    private var exactAlarmPermissionDenied by mutableStateOf(false)
     
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        Log.d("MainActivity", "権限リクエスト結果: $isGranted")
+        Log.d("MainActivity", "通知権限リクエスト結果: $isGranted")
         notificationPermissionDenied = !isGranted
         
         if (!isGranted) {
@@ -47,14 +51,22 @@ class MainActivity : ComponentActivity() {
             } else false
             
             if (!shouldShowRationale) {
-                Log.d("MainActivity", "権限が永続的に拒否されました。設定画面への誘導が必要です。")
-                // 「今後表示しない」が選択された場合、設定画面へ誘導
+                Log.d("MainActivity", "通知権限が永続的に拒否されました。設定画面への誘導が必要です。")
             } else {
-                Log.d("MainActivity", "権限が一時的に拒否されました。")
+                Log.d("MainActivity", "通知権限が一時的に拒否されました。")
             }
         } else {
             Log.d("MainActivity", "通知権限が許可されました。")
         }
+    }
+    
+    private val exactAlarmPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        Log.d("MainActivity", "正確なアラーム権限設定画面から戻りました")
+        checkExactAlarmPermission()
+        // TimerApplicationの権限状態も更新
+        TimerApplication.getInstance().updateExactAlarmPermissionState()
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,8 +79,11 @@ class MainActivity : ComponentActivity() {
                     TimerScreen(
                         modifier = Modifier.padding(innerPadding),
                         notificationPermissionDenied = notificationPermissionDenied,
+                        exactAlarmPermissionDenied = exactAlarmPermissionDenied,
                         onRetryPermissionRequest = { requestNotificationPermission() },
-                        onOpenSettings = { openNotificationSettings() }
+                        onOpenSettings = { openNotificationSettings() },
+                        onRetryExactAlarmPermission = { requestExactAlarmPermission() },
+                        onOpenAlarmSettings = { openExactAlarmSettings() }
                     )
                 }
             }
@@ -79,6 +94,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // アプリが表示されるたびに権限をチェック
         checkAndRequestPermissions()
+        // TimerApplicationの権限状態も更新
+        TimerApplication.getInstance().updateExactAlarmPermissionState()
         // タイマー実行中の場合は通知を復旧
         restoreNotificationIfNeeded()
     }
@@ -123,6 +140,7 @@ class MainActivity : ComponentActivity() {
     
     private fun checkAndRequestPermissions() {
         requestNotificationPermission()
+        checkExactAlarmPermission()
         // バッテリー最適化の除外を要求
         requestBatteryOptimizationExemption()
     }
@@ -169,6 +187,80 @@ class MainActivity : ComponentActivity() {
         }
     }
     
+    private fun checkExactAlarmPermission() {
+        // Android 12以降でSCHEDULE_EXACT_ALARM権限が必要
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val hasPermission = alarmManager.canScheduleExactAlarms()
+            
+            Log.d("MainActivity", "正確なアラーム権限状態: $hasPermission")
+            exactAlarmPermissionDenied = !hasPermission
+            
+            if (!hasPermission) {
+                Log.d("MainActivity", "正確なアラーム権限がありません。")
+            } else {
+                Log.d("MainActivity", "正確なアラーム権限が既に許可されています。")
+            }
+        } else {
+            Log.d("MainActivity", "Android 11以前のため正確なアラーム権限は不要です。")
+            exactAlarmPermissionDenied = false
+        }
+    }
+    
+    private fun requestExactAlarmPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                // Android 12以降専用のアラーム権限設定画面
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                exactAlarmPermissionLauncher.launch(intent)
+                Log.d("MainActivity", "アラーム権限設定画面を開きました")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "アラーム権限設定画面を開けませんでした: ${e.message}")
+                // フォールバック1: アラーム&リマインダー設定画面を試行
+                tryOpenAlarmSettings()
+            }
+        }
+    }
+    
+    private fun tryOpenAlarmSettings() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // 特別なアプリアクセス > アラーム&リマインダー設定画面（Android 12以降）
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                startActivity(intent)
+                Log.d("MainActivity", "特別なアプリアクセス > アラーム&リマインダー設定画面を開きました")
+            } else {
+                openExactAlarmSettings()
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "特別なアプリアクセス設定画面を開けませんでした: ${e.message}")
+            // フォールバック: 手動で特別なアプリアクセス画面を開く
+            tryOpenSpecialAppAccessSettings()
+        }
+    }
+    
+    private fun tryOpenSpecialAppAccessSettings() {
+        try {
+            // 設定画面のメイン画面を開く
+            val intent = Intent(Settings.ACTION_SETTINGS)
+            startActivity(intent)
+            Log.d("MainActivity", "設定画面を開きました")
+            
+            // ユーザーガイダンスをToastで表示
+            Toast.makeText(
+                this,
+                "アプリ → 特別なアプリアクセス → アラームとリマインダー で許可してください",
+                Toast.LENGTH_LONG
+            ).show()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "設定画面を開けませんでした: ${e.message}")
+            // 最終フォールバック: 通常のアプリ設定画面
+            openExactAlarmSettings()
+        }
+    }
+    
     private fun openNotificationSettings() {
         try {
             val intent = Intent().apply {
@@ -181,6 +273,32 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             Log.e("MainActivity", "設定画面を開けませんでした: ${e.message}")
         }
+    }
+    
+    private fun openExactAlarmSettings() {
+        try {
+            // Android 12以降では、システム設定のアプリ詳細画面に移動
+            val intent = Intent().apply {
+                action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                data = Uri.parse("package:$packageName")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            Log.d("MainActivity", "アプリ設定画面を開きました")
+            
+            // ユーザーガイダンスをToastで表示
+            showAlarmPermissionGuidance()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "アプリ設定画面を開けませんでした: ${e.message}")
+        }
+    }
+    
+    private fun showAlarmPermissionGuidance() {
+        Toast.makeText(
+            this,
+            "設定 → アプリ → 特別なアプリアクセス → アラームとリマインダー で許可してください",
+            Toast.LENGTH_LONG
+        ).show()
     }
     
     private fun requestBatteryOptimizationExemption() {

@@ -12,10 +12,8 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- ウェイクロック権限（画面がオフでもタイマーが動作するため） -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- AlarmManagerでの正確なアラーム設定 -->
+    <!-- AlarmManagerでの正確なアラーム設定（Android 12以降） -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <!-- Android 12以降でのAlarmManager使用 -->
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <application
         android:name=".TimerApplication"

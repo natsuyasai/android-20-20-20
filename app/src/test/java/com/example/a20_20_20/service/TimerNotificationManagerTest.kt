@@ -19,12 +19,19 @@ class TimerNotificationManagerTest {
 
     private val mockContext = mock<Context>()
     private val mockNotificationManager = mock<NotificationManager>()
-
-    @Test
-    fun `通知チャンネルが作成される`() {
+    
+    init {
+        // NotificationManagerサービスのモック設定
         whenever(mockContext.getSystemService(Context.NOTIFICATION_SERVICE))
             .thenReturn(mockNotificationManager)
         
+        // その他のContext機能をモック
+        whenever(mockContext.packageName).thenReturn("com.example.a20_20_20")
+        whenever(mockContext.applicationContext).thenReturn(mockContext)
+    }
+
+    @Test
+    fun `通知チャンネルが作成される`() {
         val notificationManager = TimerNotificationManager(mockContext)
         
         // チャンネル作成が呼ばれることを検証
