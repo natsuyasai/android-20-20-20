@@ -55,8 +55,18 @@ class TimerEngine(
                 startAlarmBasedTimer()
             }
             TimerStatus.PAUSED -> {
-                // 再開：一時停止からの再開では、残り時間をそのまま維持
-                // 一時停止した時点の状態を復元するだけで十分
+                // 再開：一時停止からの再開時は、経過時間を調整
+                val currentTime = System.currentTimeMillis()
+                val phaseStartTime = calculatePhaseStartTime(currentState)
+                val phaseDuration = when (currentState.currentPhase) {
+                    TimerPhase.WORK -> currentState.settings.workDurationMillis
+                    TimerPhase.BREAK -> currentState.settings.breakDurationMillis
+                }
+                val elapsedTimeInPhase = phaseDuration - currentState.remainingTimeMillis
+                
+                // startTimeMillisを調整して、経過時間を考慮
+                startTimeMillis = currentTime - (phaseStartTime + elapsedTimeInPhase)
+                
                 _timerState.value = currentState.start()
                 startAlarmBasedTimer()
             }
@@ -72,12 +82,24 @@ class TimerEngine(
         updateTimerJob?.cancel()
         val currentState = _timerState.value
         if (currentState.status == TimerStatus.RUNNING) {
-            // AlarmManagerベースでは、一時停止時は現在の残り時間をそのまま保持
-            // AlarmManagerが設定した正確な残り時間から独自計算は不要
+            // 一時停止時に現在の正確な残り時間を計算して保存
+            val currentTime = System.currentTimeMillis()
+            val elapsedTime = currentTime - startTimeMillis
+            val phaseStartTime = calculatePhaseStartTime(currentState)
+            val phaseElapsedTime = elapsedTime - phaseStartTime
+            
+            val phaseDuration = when (currentState.currentPhase) {
+                TimerPhase.WORK -> currentState.settings.workDurationMillis
+                TimerPhase.BREAK -> currentState.settings.breakDurationMillis
+            }
+            
+            val accurateRemainingTime = (phaseDuration - phaseElapsedTime).coerceAtLeast(0L)
+            
             _timerState.value = currentState.copy(
-                status = TimerStatus.PAUSED
+                status = TimerStatus.PAUSED,
+                remainingTimeMillis = accurateRemainingTime
             )
-            android.util.Log.d("TimerEngine", "Timer paused with remaining: ${currentState.remainingTimeMillis}ms")
+            android.util.Log.d("TimerEngine", "Timer paused with remaining: ${accurateRemainingTime}ms")
         }
     }
 
@@ -145,12 +167,39 @@ class TimerEngine(
     }
     
     private fun updateRemainingTimeForDisplay(currentState: TimerState) {
-        // AlarmManagerベースでは、正確な残り時間はフェーズ完了時まで維持される
-        // UI更新は主に通知やUI表示の同期のためのものであり、時間計算は行わない
-        // 実際の残り時間の更新はAlarmManagerからのフェーズ完了時のみ実行される
+        // AlarmManagerがフェーズ完了を管理し、ここではUI表示用の残り時間のみ計算
+        val currentTime = System.currentTimeMillis()
+        val elapsedTime = currentTime - startTimeMillis
         
-        // 必要に応じて将来のUI表示用の軽微な更新ロジックをここに追加可能
-        // 現在は残り時間の独自計算は実行せず、AlarmManagerに委ねる
+        // 現在のフェーズの経過時間を計算
+        val phaseStartTime = calculatePhaseStartTime(currentState)
+        val phaseElapsedTime = elapsedTime - phaseStartTime
+        
+        val phaseDuration = when (currentState.currentPhase) {
+            TimerPhase.WORK -> currentState.settings.workDurationMillis
+            TimerPhase.BREAK -> currentState.settings.breakDurationMillis
+        }
+        
+        // UI表示用の残り時間を計算（負の値にならないよう制限）
+        val newRemainingTime = (phaseDuration - phaseElapsedTime).coerceAtLeast(0L)
+        
+        // UI表示用に残り時間を更新（フェーズ完了判定は行わない）
+        if (newRemainingTime != currentState.remainingTimeMillis) {
+            _timerState.value = currentState.copy(remainingTimeMillis = newRemainingTime)
+        }
+    }
+    
+    private fun calculatePhaseStartTime(state: TimerState): Long {
+        // 現在のサイクルまでの累積時間を計算
+        val completedCyclesTime = state.completedCycles * (state.settings.workDurationMillis + state.settings.breakDurationMillis)
+        
+        // 現在のサイクル内でのフェーズ開始時間
+        val currentCyclePhaseTime = when (state.currentPhase) {
+            TimerPhase.WORK -> 0L
+            TimerPhase.BREAK -> state.settings.workDurationMillis
+        }
+        
+        return completedCyclesTime + currentCyclePhaseTime
     }
     
     private fun calculateOptimalUpdateInterval(state: TimerState): Long {
