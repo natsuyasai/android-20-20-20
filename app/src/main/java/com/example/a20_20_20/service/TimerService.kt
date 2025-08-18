@@ -33,11 +33,12 @@ class TimerService : Service() {
         const val ACTION_START_TIMER = "com.example.a20_20_20.START_TIMER"
         const val ACTION_PAUSE_TIMER = "com.example.a20_20_20.PAUSE_TIMER"
         const val ACTION_STOP_TIMER = "com.example.a20_20_20.STOP_TIMER"
+        const val ACTION_PHASE_COMPLETE = "com.example.a20_20_20.PHASE_COMPLETE"
     }
 
     override fun onCreate() {
         super.onCreate()
-        timerEngine = TimerEngine()
+        timerEngine = TimerEngine(this)
         notificationManager = TimerNotificationManager(this)
         
         // ウェイクロックを取得（画面OFFを許容するPARTIAL_WAKE_LOCK）
@@ -85,6 +86,7 @@ class TimerService : Service() {
             ACTION_START_TIMER -> startTimer()
             ACTION_PAUSE_TIMER -> pauseTimer()
             ACTION_STOP_TIMER -> stopTimer()
+            ACTION_PHASE_COMPLETE -> handlePhaseComplete()
         }
         return START_STICKY // サービスが強制終了されても再起動
     }
@@ -160,6 +162,27 @@ class TimerService : Service() {
     private var lastObservedPhase: TimerPhase? = null
     private var lastObservedCycle: Int = 0
     private var lastRemainingTime: Long = Long.MAX_VALUE
+
+    private fun handlePhaseComplete() {
+        android.util.Log.d("TimerService", "Handling phase completion from AlarmManager")
+        
+        // 手動停止の場合は通知しない
+        if (timerEngine.isManuallyStoppedRecently()) {
+            android.util.Log.d("TimerService", "Skipping phase completion notification due to manual stop")
+            return
+        }
+        
+        val currentState = timerEngine.timerState.value
+        val completedPhase = currentState.currentPhase
+        
+        // 通知音とバイブレーションを再生
+        notificationManager.showPhaseCompletionNotification(completedPhase)
+        
+        // TimerEngineでフェーズ移行処理を実行
+        timerEngine.handlePhaseCompletion()
+        
+        android.util.Log.d("TimerService", "Phase completion handled for: $completedPhase")
+    }
 
     private fun handlePhaseCompletion(state: TimerState) {
         // 手動停止の場合は通知しない
