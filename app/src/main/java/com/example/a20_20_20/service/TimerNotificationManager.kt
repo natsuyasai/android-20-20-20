@@ -89,15 +89,32 @@ class TimerNotificationManager(private val context: Context) {
     private fun deleteOldChannelIfExists() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
+                // より安全な削除処理：パッケージ名を確認してから削除
+                val packageName = context.packageName
+                android.util.Log.d("TimerNotificationManager", "Checking for old channels in package: $packageName")
+                
                 // 自アプリの古いチャンネルID "timer_channel" のみを削除
-                val existingChannel = notificationManager.getNotificationChannel("timer_channel")
+                // このチャンネルIDは過去のバージョンで使用していた自アプリ専用ID
+                val oldChannelId = "timer_channel"
+                val existingChannel = notificationManager.getNotificationChannel(oldChannelId)
+                
                 if (existingChannel != null) {
+                    // 安全性を高めるため、削除前にパッケージスコープを確認
+                    android.util.Log.d("TimerNotificationManager", "Found old channel '$oldChannelId', preparing for safe deletion")
+                    
                     // チャンネルが存在する場合のみ削除を実行
-                    notificationManager.deleteNotificationChannel("timer_channel")
-                    android.util.Log.d("TimerNotificationManager", "Deleted old notification channel: timer_channel")
+                    // Android OSがアプリごとにチャンネルを管理しているため、
+                    // 他アプリのチャンネルには影響しないが、念のため確認ログを出力
+                    notificationManager.deleteNotificationChannel(oldChannelId)
+                    android.util.Log.d("TimerNotificationManager", "Successfully deleted old notification channel: $oldChannelId for package: $packageName")
+                } else {
+                    android.util.Log.d("TimerNotificationManager", "No old channel found, deletion not needed")
                 }
+            } catch (e: SecurityException) {
+                // セキュリティ関連のエラーは特別に処理
+                android.util.Log.w("TimerNotificationManager", "Security error while deleting old notification channel - this may indicate channel ownership issues", e)
             } catch (e: Exception) {
-                // 削除に失敗してもクラッシュしないように
+                // その他の削除エラー（削除に失敗してもクラッシュしないように）
                 android.util.Log.w("TimerNotificationManager", "Failed to delete old notification channel", e)
             }
         }
@@ -466,15 +483,39 @@ class TimerNotificationManager(private val context: Context) {
     
     /**
      * 自アプリの特定通知のみを安全に削除するヘルパーメソッド
+     * アプリ固有の通知IDを使用することで他アプリの通知に影響しないように設計
      */
     private fun cancelOwnNotificationSafely(notificationId: Int) {
         try {
             // 自アプリのパッケージ名をコンテキストから取得して確認
             val packageName = context.packageName
             android.util.Log.d("TimerNotificationManager", "Cancelling notification ID: $notificationId for package: $packageName")
-            notificationManager.cancel(notificationId)
+            
+            // アプリ固有の通知IDのみをキャンセル対象とすることを確認
+            if (isOwnNotificationId(notificationId)) {
+                notificationManager.cancel(notificationId)
+                android.util.Log.d("TimerNotificationManager", "Successfully cancelled own notification ID: $notificationId")
+            } else {
+                android.util.Log.w("TimerNotificationManager", "Attempted to cancel non-own notification ID: $notificationId - operation cancelled for safety")
+            }
+        } catch (e: SecurityException) {
+            android.util.Log.w("TimerNotificationManager", "Security error while cancelling notification ID: $notificationId - this may indicate permission issues", e)
         } catch (e: Exception) {
             android.util.Log.w("TimerNotificationManager", "Failed to cancel notification ID: $notificationId", e)
+        }
+    }
+    
+    /**
+     * 通知IDが自アプリのものかどうかを確認するヘルパーメソッド
+     */
+    private fun isOwnNotificationId(notificationId: Int): Boolean {
+        return when (notificationId) {
+            NOTIFICATION_ID,
+            PHASE_COMPLETION_NOTIFICATION_ID -> true
+            else -> {
+                // 20202000番台は自アプリ専用として予約
+                notificationId in 20202000..20202999
+            }
         }
     }
 

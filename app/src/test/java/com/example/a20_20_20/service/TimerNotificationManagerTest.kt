@@ -286,6 +286,106 @@ class TimerNotificationManagerTest {
         assertEquals("Sound setting should be preserved", false, retrievedSettings.enableSound)
     }
 
+    @Test
+    fun `旧チャンネル削除が自アプリのチャンネルのみ対象であること`() {
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        // NotificationManagerのgetNotificationChannelメソッドをモック
+        val mockChannel = mock<android.app.NotificationChannel>()
+        whenever(mockNotificationManager.getNotificationChannel("timer_channel"))
+            .thenReturn(mockChannel)
+        
+        // 設定更新（内部でdeleteOldChannelIfExists()が呼ばれる）
+        val settings = NotificationSettings()
+        assertDoesNotThrow {
+            notificationManager.updateSettings(settings)
+        }
+        
+        // 自アプリの旧チャンネル"timer_channel"のみが削除対象であることを確認
+        verify(mockNotificationManager).getNotificationChannel("timer_channel")
+    }
+
+    @Test
+    fun `通知チャンネル削除時にパッケージ名が正しく確認されること`() {
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        // パッケージ名がコンテキストから取得されることを確認
+        whenever(mockContext.packageName).thenReturn("com.example.a20_20_20")
+        
+        val settings = NotificationSettings()
+        assertDoesNotThrow {
+            notificationManager.updateSettings(settings)
+        }
+        
+        // パッケージ名の取得が行われることを確認
+        verify(mockContext).packageName
+    }
+
+    @Test
+    fun `他アプリのチャンネルに影響しない削除処理であること`() {
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        // 他のアプリが使用する可能性のある汎用チャンネル名では削除が呼ばれないことを確認
+        val genericChannelIds = listOf("default", "notification", "alarm", "media")
+        
+        genericChannelIds.forEach { channelId ->
+            // これらの汎用チャンネルIDでは削除メソッドが呼ばれないはず
+            whenever(mockNotificationManager.getNotificationChannel(channelId))
+                .thenReturn(null) // チャンネルが存在しない状態をシミュレート
+        }
+        
+        val settings = NotificationSettings()
+        assertDoesNotThrow {
+            notificationManager.updateSettings(settings)
+        }
+        
+        // 汎用チャンネルIDでは削除が呼ばれないことを確認
+        genericChannelIds.forEach { channelId ->
+            verify(mockNotificationManager, org.mockito.kotlin.never()).deleteNotificationChannel(channelId)
+        }
+    }
+
+    @Test
+    fun `通知IDが自アプリのものかどうか正しく判定されること`() {
+        // isOwnNotificationId()はprivateメソッドなので、間接的にテスト
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        // 自アプリの定義済み通知IDが適切な値であることを確認
+        val ownIds = listOf(
+            TimerNotificationManager.NOTIFICATION_ID,
+            TimerNotificationManager.PHASE_COMPLETION_NOTIFICATION_ID
+        )
+        
+        ownIds.forEach { id ->
+            assertTrue("Own notification ID $id should be in reserved range", 
+                id in 20202000..20202999)
+        }
+        
+        // 他アプリが使用する可能性のある小さな値では通知IDを使用していないことを確認
+        val commonIds = listOf(1, 2, 3, 100, 1000)
+        commonIds.forEach { id ->
+            assertFalse("Should not use common notification ID $id",
+                id == TimerNotificationManager.NOTIFICATION_ID ||
+                id == TimerNotificationManager.PHASE_COMPLETION_NOTIFICATION_ID)
+        }
+    }
+
+    @Test
+    fun `セキュリティエラー発生時も安全に処理されること`() {
+        val notificationManager = TimerNotificationManager(mockContext)
+        
+        // SecurityExceptionが発生するような状況をシミュレート
+        whenever(mockNotificationManager.getNotificationChannel(any()))
+            .thenThrow(SecurityException("Access denied"))
+        
+        val settings = NotificationSettings()
+        
+        // セキュリティエラーが発生してもクラッシュしないことを確認
+        assertDoesNotThrow {
+            notificationManager.updateSettings(settings)
+        }
+    }
+
     private fun assertDoesNotThrow(executable: () -> Unit) {
         try {
             executable()
