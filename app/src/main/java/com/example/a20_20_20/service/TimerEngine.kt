@@ -158,13 +158,9 @@ class TimerEngine(
                     _timerState.value = currentState.copy(remainingTimeMillis = newRemainingTime)
                 }
                 
-                // 次の更新間隔を計算
-                val baseUpdateInterval = calculateOptimalUpdateInterval(currentState)
-                val nextUpdateInterval = when {
-                    newRemainingTime <= 3000 -> 500L // 残り3秒以下は500ms間隔
-                    newRemainingTime <= 10000 -> 1000L // 残り10秒以下は1秒間隔
-                    else -> baseUpdateInterval // それ以外は設定された間隔
-                }
+                // AlarmManagerが正確なフェーズ完了を管理するため、
+                // UI更新は一定間隔で十分
+                val nextUpdateInterval = calculateOptimalUpdateInterval(currentState)
                 
                 delay(nextUpdateInterval)
             }

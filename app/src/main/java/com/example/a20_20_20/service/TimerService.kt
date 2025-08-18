@@ -312,14 +312,9 @@ class TimerService : Service() {
     }
     
     private fun calculateNotificationCheckInterval(baseInterval: Long, remainingTimeMillis: Long): Long {
-        return when {
-            // 残り時間が3秒以下の場合は500ms間隔で高頻度チェック
-            remainingTimeMillis <= 3000 -> 500L
-            // 残り時間が10秒以下の場合は1秒間隔でチェック
-            remainingTimeMillis <= 10000 -> 1000L
-            // それ以外はタイマーの更新間隔と同じ頻度でチェック
-            else -> baseInterval
-        }
+        // AlarmManagerが正確なフェーズ管理を行うため、
+        // 通知チェックは設定された間隔で一定に実行
+        return baseInterval
     }
     
     private fun isNotificationVisible(): Boolean {
