@@ -24,19 +24,16 @@ class TimerServiceTest {
 
     @Test
     fun `通知チェック間隔の計算ロジックが正しいこと`() {
-        // 実際のTimerServiceで使用される計算ロジックをテスト
+        // AlarmManagerベースでは、通知チェック間隔は常にベース間隔と同じ
         
-        // 残り時間が3秒以下の場合は500ms間隔
-        val shortInterval = calculateTestInterval(1000L, 2000L) // baseInterval=1s, remaining=2s
-        assertEquals("短時間では500ms間隔", 500L, shortInterval)
+        val interval1 = calculateTestInterval(1000L, 2000L) // baseInterval=1s, remaining=2s
+        assertEquals("常にベース間隔", 1000L, interval1)
         
-        // 残り時間が10秒以下の場合は1秒間隔
-        val mediumInterval = calculateTestInterval(5000L, 8000L) // baseInterval=5s, remaining=8s
-        assertEquals("中程度では1秒間隔", 1000L, mediumInterval)
+        val interval2 = calculateTestInterval(5000L, 8000L) // baseInterval=5s, remaining=8s
+        assertEquals("常にベース間隔", 5000L, interval2)
         
-        // それ以外はベース間隔
-        val longInterval = calculateTestInterval(10000L, 60000L) // baseInterval=10s, remaining=1min
-        assertEquals("長時間ではベース間隔", 10000L, longInterval)
+        val interval3 = calculateTestInterval(10000L, 60000L) // baseInterval=10s, remaining=1min
+        assertEquals("常にベース間隔", 10000L, interval3)
     }
 
     @Test
@@ -65,11 +62,8 @@ class TimerServiceTest {
 
     // ヘルパーメソッド：TimerServiceの計算ロジックを模擬
     private fun calculateTestInterval(baseInterval: Long, remainingTimeMillis: Long): Long {
-        return when {
-            remainingTimeMillis <= 3000 -> 500L
-            remainingTimeMillis <= 10000 -> 1000L
-            else -> baseInterval
-        }
+        // AlarmManagerベースでは常にベース間隔を返す
+        return baseInterval
     }
 
     private fun shouldMonitorNotification(state: TimerState): Boolean {
