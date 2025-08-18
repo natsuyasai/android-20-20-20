@@ -1,5 +1,10 @@
 package com.example.a20_20_20.service
 
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerSettings
@@ -16,6 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class TimerEngine(
+    private val context: Context,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
     private val scope = CoroutineScope(dispatcher)
@@ -25,8 +31,19 @@ class TimerEngine(
     private var notificationSettings = NotificationSettings.DEFAULT
     private var isManualStop = false // 手動停止フラグ
     
+    private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    private var currentAlarmIntent: PendingIntent? = null
+    private var updateTimerJob: Job? = null // UI更新用のCoroutine
+    
     private val _timerState = MutableStateFlow(TimerState())
     val timerState: StateFlow<TimerState> = _timerState.asStateFlow()
+    
+    companion object {
+        const val ACTION_TIMER_TICK = "com.example.a20_20_20.TIMER_TICK"
+        const val ACTION_PHASE_COMPLETE = "com.example.a20_20_20.PHASE_COMPLETE"
+        private const val REQUEST_CODE_TIMER_TICK = 1001
+        private const val REQUEST_CODE_PHASE_COMPLETE = 1002
+    }
 
     fun start() {
         isManualStop = false // タイマー開始時は手動停止フラグをクリア
@@ -37,37 +54,41 @@ class TimerEngine(
                 startTimeMillis = System.currentTimeMillis()
                 pausedTimeMillis = 0L
                 _timerState.value = currentState.start()
-                startCountdown()
+                startAlarmBasedTimer()
             }
             TimerStatus.PAUSED -> {
                 // 再開
                 val pauseStartTime = startTimeMillis + (currentState.settings.workDurationMillis - currentState.remainingTimeMillis) + pausedTimeMillis
                 pausedTimeMillis += System.currentTimeMillis() - pauseStartTime
                 _timerState.value = currentState.start()
-                startCountdown()
+                startAlarmBasedTimer()
             }
             TimerStatus.RUNNING -> {
                 // 既に実行中の場合は何もしない（2重起動防止）
-                // ログ出力やデバッグ用（プロダクションでは削除可能）
+                android.util.Log.d("TimerEngine", "Timer already running, ignoring start request")
             }
         }
     }
 
     fun pause() {
-        timerJob?.cancel()
+        cancelAlarms()
+        updateTimerJob?.cancel()
         val currentState = _timerState.value
         if (currentState.status == TimerStatus.RUNNING) {
             _timerState.value = currentState.pause()
+            android.util.Log.d("TimerEngine", "Timer paused")
         }
     }
 
     fun stop() {
         isManualStop = true // 手動停止フラグを設定
-        timerJob?.cancel()
+        cancelAlarms()
+        updateTimerJob?.cancel()
         startTimeMillis = 0L
         pausedTimeMillis = 0L
         val currentState = _timerState.value
         _timerState.value = currentState.stop()
+        android.util.Log.d("TimerEngine", "Timer stopped")
     }
 
     fun updateSettings(settings: TimerSettings) {
@@ -77,9 +98,9 @@ class TimerEngine(
     
     fun updateNotificationSettings(settings: NotificationSettings) {
         notificationSettings = settings
-        // 実行中の場合は更新間隔を反映するためにカウントダウンを再開
+        // 実行中の場合は更新間隔を反映するためにUI更新を再開
         if (_timerState.value.status == TimerStatus.RUNNING) {
-            startCountdown()
+            startUIUpdateTimer()
         }
     }
     
@@ -87,9 +108,28 @@ class TimerEngine(
         return isManualStop
     }
 
-    private fun startCountdown() {
-        timerJob?.cancel()
-        timerJob = scope.launch {
+    private fun startAlarmBasedTimer() {
+        cancelAlarms()
+        
+        val currentState = _timerState.value
+        val phaseDuration = when (currentState.currentPhase) {
+            TimerPhase.WORK -> currentState.settings.workDurationMillis
+            TimerPhase.BREAK -> currentState.settings.breakDurationMillis
+        }
+        
+        // フェーズ完了のアラームを設定
+        val phaseCompleteTime = System.currentTimeMillis() + currentState.remainingTimeMillis
+        schedulePhaseCompleteAlarm(phaseCompleteTime)
+        
+        // UI更新用のタイマーを開始
+        startUIUpdateTimer()
+        
+        android.util.Log.d("TimerEngine", "AlarmManager-based timer started, phase will complete in ${currentState.remainingTimeMillis}ms")
+    }
+    
+    private fun startUIUpdateTimer() {
+        updateTimerJob?.cancel()
+        updateTimerJob = scope.launch {
             while (_timerState.value.status == TimerStatus.RUNNING) {
                 val currentState = _timerState.value
                 if (currentState.status != TimerStatus.RUNNING) break
@@ -110,29 +150,23 @@ class TimerEngine(
                 val newRemainingTime = phaseDuration - phaseElapsedTime
                 
                 if (newRemainingTime <= 0) {
-                    // フェーズ完了 - 即座に処理して次のフェーズに移行
-                    handlePhaseCompletion(currentState)
-                    // フェーズが切り替わった場合は短時間後に再度更新（遅延なしで次のフェーズを開始）
-                    delay(50L) // 50ms後に次のフェーズの更新を開始
+                    // フェーズ完了はAlarmManagerで処理されるため、ここでは状態を0に設定
+                    _timerState.value = currentState.copy(remainingTimeMillis = 0L)
+                    break
                 } else {
                     // 時間更新
                     _timerState.value = currentState.copy(remainingTimeMillis = newRemainingTime)
-                    
-                    // 次の更新間隔を計算（残り時間が短い場合は短い間隔で更新）
-                    val baseUpdateInterval = calculateOptimalUpdateInterval(currentState)
-                    val nextUpdateInterval = if (newRemainingTime <= 3000) {
-                        // 残り3秒以下の場合は500ms間隔で精密に更新
-                        500L
-                    } else if (newRemainingTime <= 10000) {
-                        // 残り10秒以下の場合は1000ms間隔で更新
-                        1000L
-                    } else {
-                        // それ以外は設定された間隔
-                        baseUpdateInterval
-                    }
-                    
-                    delay(nextUpdateInterval)
                 }
+                
+                // 次の更新間隔を計算
+                val baseUpdateInterval = calculateOptimalUpdateInterval(currentState)
+                val nextUpdateInterval = when {
+                    newRemainingTime <= 3000 -> 500L // 残り3秒以下は500ms間隔
+                    newRemainingTime <= 10000 -> 1000L // 残り10秒以下は1秒間隔
+                    else -> baseUpdateInterval // それ以外は設定された間隔
+                }
+                
+                delay(nextUpdateInterval)
             }
         }
     }
@@ -166,18 +200,68 @@ class TimerEngine(
         return completedCyclesTime + currentCyclePhaseTime
     }
 
-    private fun handlePhaseCompletion(currentState: TimerState) {
+    private fun schedulePhaseCompleteAlarm(triggerTime: Long) {
+        val intent = Intent(context, TimerAlarmReceiver::class.java).apply {
+            action = ACTION_PHASE_COMPLETE
+        }
+        
+        currentAlarmIntent = PendingIntent.getBroadcast(
+            context,
+            REQUEST_CODE_PHASE_COMPLETE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                // Android 6.0以降では正確なアラームのためsetExactAndAllowWhileIdleを使用
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    currentAlarmIntent!!
+                )
+            } else {
+                // Android 6.0未満ではsetExactを使用
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    currentAlarmIntent!!
+                )
+            }
+            android.util.Log.d("TimerEngine", "Phase complete alarm scheduled for: $triggerTime")
+        } catch (e: SecurityException) {
+            android.util.Log.e("TimerEngine", "Failed to set exact alarm, falling back to inexact alarm", e)
+            // 正確なアラームに失敗した場合は通常のアラームを使用
+            alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, currentAlarmIntent!!)
+        }
+    }
+    
+    private fun cancelAlarms() {
+        currentAlarmIntent?.let { pendingIntent ->
+            alarmManager.cancel(pendingIntent)
+            pendingIntent.cancel()
+            android.util.Log.d("TimerEngine", "Alarms cancelled")
+        }
+        currentAlarmIntent = null
+    }
+    
+    fun handlePhaseCompletion() {
+        val currentState = _timerState.value
+        android.util.Log.d("TimerEngine", "Handling phase completion for: ${currentState.currentPhase}")
+        
         val nextState = currentState.nextPhase()
         
         if (nextState.isCompleted()) {
             // 全サイクル完了
-            startTimeMillis = 0L
-            pausedTimeMillis = 0L
-            _timerState.value = nextState.stop()
+            stop()
         } else {
             // 次のフェーズに移行
-            // システム時刻の調整は不要（calculatePhaseStartTimeで適切に計算される）
             _timerState.value = nextState
+            
+            // 新しいフェーズのアラームを設定
+            if (nextState.status == TimerStatus.RUNNING) {
+                startAlarmBasedTimer()
+            }
         }
     }
 }

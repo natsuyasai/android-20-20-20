@@ -12,6 +12,10 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- ウェイクロック権限（画面がオフでもタイマーが動作するため） -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- AlarmManagerでの正確なアラーム設定 -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Android 12以降でのAlarmManager使用 -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <application
         android:name=".TimerApplication"
@@ -46,6 +50,17 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="タイマー機能" />
         </service>
+        
+        <!-- AlarmManagerからのブロードキャスト受信 -->
+        <receiver
+            android:name=".service.TimerAlarmReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.a20_20_20.TIMER_TICK" />
+                <action android:name="com.example.a20_20_20.PHASE_COMPLETE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
