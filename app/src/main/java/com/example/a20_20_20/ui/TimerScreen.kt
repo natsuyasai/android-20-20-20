@@ -210,10 +210,10 @@ fun SwipeableTimeDisplay(
     
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val clockSize = if (isLandscape) 160f else 200f
-    val digitalFontSize = if (isLandscape) 60.sp else 88.sp
+    val clockSize = if (isLandscape) 140f else 200f
+    val digitalFontSize = if (isLandscape) 48.sp else 88.sp
     
-    Box(
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .pointerInput(Unit) {
@@ -238,7 +238,7 @@ fun SwipeableTimeDisplay(
                     dragOffset += dragAmount
                 }
             },
-        contentAlignment = Alignment.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         when (displayMode) {
             TimeDisplayMode.DIGITAL -> {
@@ -250,29 +250,36 @@ fun SwipeableTimeDisplay(
                 )
             }
             TimeDisplayMode.ANALOG -> {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    AnalogClock(
-                        remainingTimeInSeconds = remainingTimeInSeconds,
-                        totalTimeInSeconds = totalTimeInSeconds,
-                        size = clockSize
-                    )
-                    Text(
-                        text = formattedTime,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
+                if (isLandscape) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        AnalogClock(
+                            remainingTimeInSeconds = remainingTimeInSeconds,
+                            totalTimeInSeconds = totalTimeInSeconds,
+                            size = clockSize
+                        )
+                    }
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        AnalogClock(
+                            remainingTimeInSeconds = remainingTimeInSeconds,
+                            totalTimeInSeconds = totalTimeInSeconds,
+                            size = clockSize
+                        )
+                    }
                 }
             }
         }
         
+        Spacer(modifier = Modifier.height(16.dp))
+        
         // スワイプヒント
         Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(top = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             repeat(2) { index ->
@@ -377,64 +384,136 @@ fun TimerContent(
     onStopClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // 設定ボタン
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
+    if (isLandscape) {
+        // 横向き時のレイアウト
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+            modifier = modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            IconButton(onClick = onSettingsClick) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "設定"
+            // 左側：時間表示エリア
+            Box(
+                modifier = Modifier.weight(1.2f),
+                contentAlignment = Alignment.Center
+            ) {
+                // 残り時間表示
+                SwipeableTimeDisplay(
+                    formattedTime = uiState.formattedTime,
+                    remainingTimeInSeconds = uiState.remainingTimeInSeconds,
+                    totalTimeInSeconds = uiState.totalTimeInSeconds,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            
+            // 右側：情報とコントロールエリア
+            Column(
+                modifier = Modifier.weight(0.8f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // 設定ボタン
+                IconButton(onClick = onSettingsClick) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "設定"
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // フェーズ表示
+                Text(
+                    text = uiState.phaseLabel,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // サイクル情報表示
+                Text(
+                    text = uiState.cycleInfo,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // コントロールボタン
+                TimerControls(
+                    status = uiState.timerState.status,
+                    onStartClick = onStartClick,
+                    onPauseClick = onPauseClick,
+                    onStopClick = onStopClick
                 )
             }
         }
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        // フェーズ表示
-        Text(
-            text = uiState.phaseLabel,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // 残り時間表示
-        SwipeableTimeDisplay(
-            formattedTime = uiState.formattedTime,
-            remainingTimeInSeconds = uiState.remainingTimeInSeconds,
-            totalTimeInSeconds = uiState.totalTimeInSeconds,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        // サイクル情報表示
-        Text(
-            text = uiState.cycleInfo,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        // コントロールボタン
-        TimerControls(
-            status = uiState.timerState.status,
-            onStartClick = onStartClick,
-            onPauseClick = onPauseClick,
-            onStopClick = onStopClick
-        )
-        
-        Spacer(modifier = Modifier.weight(1f))
+    } else {
+        // 縦向き時のレイアウト
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // 設定ボタン
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                IconButton(onClick = onSettingsClick) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "設定"
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.weight(1f))
+            
+            // フェーズ表示
+            Text(
+                text = uiState.phaseLabel,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // 残り時間表示
+            SwipeableTimeDisplay(
+                formattedTime = uiState.formattedTime,
+                remainingTimeInSeconds = uiState.remainingTimeInSeconds,
+                totalTimeInSeconds = uiState.totalTimeInSeconds,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // サイクル情報表示
+            Text(
+                text = uiState.cycleInfo,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            // コントロールボタン
+            TimerControls(
+                status = uiState.timerState.status,
+                onStartClick = onStartClick,
+                onPauseClick = onPauseClick,
+                onStopClick = onStopClick
+            )
+            
+            Spacer(modifier = Modifier.weight(1f))
+        }
     }
 }
 
@@ -631,5 +710,43 @@ fun SwipeableTimeDisplayPreview() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Preview(
+    showBackground = true,
+    widthDp = 640,
+    heightDp = 360,
+    name = "横表示 - デジタル"
+)
+@Composable
+fun TimerContentLandscapeDigitalPreview() {
+    _20_20_20Theme {
+        TimerContent(
+            uiState = TimerUiState(),
+            onStartClick = {},
+            onPauseClick = {},
+            onStopClick = {},
+            onSettingsClick = {}
+        )
+    }
+}
+
+@Preview(
+    showBackground = true,
+    widthDp = 640,
+    heightDp = 360,
+    name = "横表示 - アナログ"
+)
+@Composable
+fun TimerContentLandscapeAnalogPreview() {
+    _20_20_20Theme {
+        TimerContent(
+            uiState = TimerUiState(),
+            onStartClick = {},
+            onPauseClick = {},
+            onStopClick = {},
+            onSettingsClick = {}
+        )
     }
 }
