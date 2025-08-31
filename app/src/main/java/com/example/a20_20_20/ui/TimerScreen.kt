@@ -2,7 +2,10 @@ package com.example.a20_20_20.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
@@ -10,15 +13,32 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.sin
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerStatus
 import com.example.a20_20_20.ui.theme._20_20_20Theme
+
+enum class TimeDisplayMode {
+    DIGITAL,
+    ANALOG
+}
 
 @Composable
 fun TimerScreen(
@@ -75,6 +95,200 @@ fun TimerScreen(
                 onStopClick = { viewModel.stopTimer() },
                 onSettingsClick = { viewModel.navigateToSettings() }
             )
+        }
+    }
+}
+
+@Composable
+fun AnalogClock(
+    remainingTimeInSeconds: Int,
+    totalTimeInSeconds: Int,
+    modifier: Modifier = Modifier,
+    size: Float = 200f
+) {
+    val progress = if (totalTimeInSeconds > 0) {
+        (totalTimeInSeconds - remainingTimeInSeconds).toFloat() / totalTimeInSeconds
+    } else 0f
+    
+    val minutes = remainingTimeInSeconds / 60
+    val seconds = remainingTimeInSeconds % 60
+    
+    Canvas(
+        modifier = modifier
+            .size(size.dp)
+            .clip(CircleShape)
+    ) {
+        val center = Offset(size.dp.toPx() / 2, size.dp.toPx() / 2)
+        val radius = size.dp.toPx() / 2 - 20f
+        val strokeWidth = 8f
+        
+        // 背景円
+        drawCircle(
+            color = Color.Gray.copy(alpha = 0.3f),
+            radius = radius,
+            center = center,
+            style = Stroke(width = strokeWidth)
+        )
+        
+        // 進捗円
+        drawArc(
+            color = Color.Blue,
+            startAngle = -90f,
+            sweepAngle = progress * 360f,
+            useCenter = false,
+            topLeft = Offset(center.x - radius, center.y - radius),
+            size = Size(radius * 2, radius * 2),
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+        )
+        
+        // 時計の針（分）
+        val minuteAngle = (minutes % 60) * 6f - 90f // 6度 = 360/60
+        val minuteHandLength = radius * 0.7f
+        val minuteEndX = center.x + cos(Math.toRadians(minuteAngle.toDouble())).toFloat() * minuteHandLength
+        val minuteEndY = center.y + sin(Math.toRadians(minuteAngle.toDouble())).toFloat() * minuteHandLength
+        
+        drawLine(
+            color = Color.Black,
+            start = center,
+            end = Offset(minuteEndX, minuteEndY),
+            strokeWidth = 6f,
+            cap = StrokeCap.Round
+        )
+        
+        // 時計の針（秒）
+        val secondAngle = seconds * 6f - 90f // 6度 = 360/60
+        val secondHandLength = radius * 0.9f
+        val secondEndX = center.x + cos(Math.toRadians(secondAngle.toDouble())).toFloat() * secondHandLength
+        val secondEndY = center.y + sin(Math.toRadians(secondAngle.toDouble())).toFloat() * secondHandLength
+        
+        drawLine(
+            color = Color.Red,
+            start = center,
+            end = Offset(secondEndX, secondEndY),
+            strokeWidth = 3f,
+            cap = StrokeCap.Round
+        )
+        
+        // 中心点
+        drawCircle(
+            color = Color.Black,
+            radius = 8f,
+            center = center
+        )
+        
+        // 時間マーカー
+        for (i in 0 until 12) {
+            val angle = i * 30f - 90f // 30度間隔
+            val markerStart = radius * 0.85f
+            val markerEnd = radius * 0.95f
+            
+            val startX = center.x + cos(Math.toRadians(angle.toDouble())).toFloat() * markerStart
+            val startY = center.y + sin(Math.toRadians(angle.toDouble())).toFloat() * markerStart
+            val endX = center.x + cos(Math.toRadians(angle.toDouble())).toFloat() * markerEnd
+            val endY = center.y + sin(Math.toRadians(angle.toDouble())).toFloat() * markerEnd
+            
+            drawLine(
+                color = Color.Black,
+                start = Offset(startX, startY),
+                end = Offset(endX, endY),
+                strokeWidth = if (i % 3 == 0) 4f else 2f,
+                cap = StrokeCap.Round
+            )
+        }
+    }
+}
+
+@Composable
+fun SwipeableTimeDisplay(
+    formattedTime: String,
+    remainingTimeInSeconds: Int,
+    totalTimeInSeconds: Int,
+    modifier: Modifier = Modifier
+) {
+    var displayMode by remember { mutableStateOf(TimeDisplayMode.DIGITAL) }
+    var dragOffset by remember { mutableStateOf(0f) }
+    
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val clockSize = if (isLandscape) 160f else 200f
+    val digitalFontSize = if (isLandscape) 60.sp else 88.sp
+    
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (dragOffset > 100f) {
+                            displayMode = if (displayMode == TimeDisplayMode.DIGITAL) {
+                                TimeDisplayMode.ANALOG
+                            } else {
+                                TimeDisplayMode.DIGITAL
+                            }
+                        } else if (dragOffset < -100f) {
+                            displayMode = if (displayMode == TimeDisplayMode.ANALOG) {
+                                TimeDisplayMode.DIGITAL
+                            } else {
+                                TimeDisplayMode.ANALOG
+                            }
+                        }
+                        dragOffset = 0f
+                    }
+                ) { _, dragAmount ->
+                    dragOffset += dragAmount
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        when (displayMode) {
+            TimeDisplayMode.DIGITAL -> {
+                Text(
+                    text = formattedTime,
+                    style = MaterialTheme.typography.displayLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = digitalFontSize
+                )
+            }
+            TimeDisplayMode.ANALOG -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AnalogClock(
+                        remainingTimeInSeconds = remainingTimeInSeconds,
+                        totalTimeInSeconds = totalTimeInSeconds,
+                        size = clockSize
+                    )
+                    Text(
+                        text = formattedTime,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+        
+        // スワイプヒント
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(top = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            repeat(2) { index ->
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (index == displayMode.ordinal) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            }
+                        )
+                )
+            }
         }
     }
 }
@@ -194,11 +408,11 @@ fun TimerContent(
         Spacer(modifier = Modifier.height(16.dp))
         
         // 残り時間表示
-        Text(
-            text = uiState.formattedTime,
-            style = MaterialTheme.typography.displayLarge,
-            fontWeight = FontWeight.Bold,
-            fontSize = 88.sp
+        SwipeableTimeDisplay(
+            formattedTime = uiState.formattedTime,
+            remainingTimeInSeconds = uiState.remainingTimeInSeconds,
+            totalTimeInSeconds = uiState.totalTimeInSeconds,
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
         
         Spacer(modifier = Modifier.height(8.dp))
@@ -373,5 +587,49 @@ fun TimerScreenPreview() {
             onStopClick = {},
             onSettingsClick = {}
         )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AnalogClockPreview() {
+    _20_20_20Theme {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text("アナログ時計表示", style = MaterialTheme.typography.headlineSmall)
+            AnalogClock(
+                remainingTimeInSeconds = 300, // 5分
+                totalTimeInSeconds = 1200, // 20分
+                size = 200f
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SwipeableTimeDisplayPreview() {
+    _20_20_20Theme {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("スワイプ対応時間表示", style = MaterialTheme.typography.headlineSmall)
+            Spacer(modifier = Modifier.height(16.dp))
+            SwipeableTimeDisplay(
+                formattedTime = "05:00",
+                remainingTimeInSeconds = 300,
+                totalTimeInSeconds = 1200,
+                modifier = Modifier.height(280.dp)
+            )
+            Text(
+                "左右にスワイプして表示を切り替え",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
