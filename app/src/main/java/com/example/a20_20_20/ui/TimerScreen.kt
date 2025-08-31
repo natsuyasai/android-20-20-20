@@ -198,7 +198,7 @@ fun TimerContent(
             text = uiState.formattedTime,
             style = MaterialTheme.typography.displayLarge,
             fontWeight = FontWeight.Bold,
-            fontSize = 64.sp
+            fontSize = 88.sp
         )
         
         Spacer(modifier = Modifier.height(8.dp))
