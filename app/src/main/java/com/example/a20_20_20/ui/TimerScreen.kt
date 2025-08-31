@@ -23,6 +23,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -113,11 +119,15 @@ fun AnalogClock(
     val minutes = remainingTimeInSeconds / 60
     val seconds = remainingTimeInSeconds % 60
     
-    Canvas(
-        modifier = modifier
-            .size(size.dp)
-            .clip(CircleShape)
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
     ) {
+        Canvas(
+            modifier = Modifier
+                .size(size.dp)
+                .clip(CircleShape)
+        ) {
         val center = Offset(size.dp.toPx() / 2, size.dp.toPx() / 2)
         val radius = size.dp.toPx() / 2 - 20f
         val strokeWidth = 8f
@@ -195,6 +205,70 @@ fun AnalogClock(
                 cap = StrokeCap.Round
             )
         }
+        }
+    }
+}
+
+@Composable
+fun AutoSizeText(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = LocalTextStyle.current,
+    maxLines: Int = Int.MAX_VALUE,
+    minTextSize: Float = 12f,
+    maxTextSize: Float = 80f
+) {
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    
+    BoxWithConstraints(modifier = modifier) {
+        val constraintsMaxWidth = this.maxWidth
+        val constraintsMaxHeight = this.maxHeight
+        val maxWidthPx = with(density) { constraintsMaxWidth.toPx() }
+        val maxHeightPx = with(density) { constraintsMaxHeight.toPx() }
+        
+        var textSize by remember(text, constraintsMaxWidth, constraintsMaxHeight) {
+            mutableStateOf(maxTextSize)
+        }
+        
+        LaunchedEffect(text, constraintsMaxWidth, constraintsMaxHeight) {
+            var currentSize = maxTextSize
+            
+            while (currentSize >= minTextSize) {
+                val currentStyle = style.copy(fontSize = with(density) { currentSize.sp })
+                val textLayoutResult = textMeasurer.measure(
+                    text = text,
+                    style = currentStyle,
+                    constraints = Constraints(
+                        maxWidth = maxWidthPx.toInt(),
+                        maxHeight = if (maxLines == 1) Constraints.Infinity else maxHeightPx.toInt()
+                    ),
+                    maxLines = maxLines
+                )
+                
+                if (textLayoutResult.size.width <= maxWidthPx &&
+                    (maxLines == Int.MAX_VALUE || textLayoutResult.lineCount <= maxLines) &&
+                    textLayoutResult.size.height <= maxHeightPx
+                ) {
+                    textSize = currentSize
+                    break
+                }
+                
+                currentSize -= 2f
+            }
+            
+            if (textSize < minTextSize) {
+                textSize = minTextSize
+            }
+        }
+        
+        Text(
+            text = text,
+            style = style.copy(fontSize = with(density) { textSize.sp }),
+            maxLines = maxLines,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
@@ -242,35 +316,53 @@ fun SwipeableTimeDisplay(
     ) {
         when (displayMode) {
             TimeDisplayMode.DIGITAL -> {
-                Text(
-                    text = formattedTime,
-                    style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = digitalFontSize
-                )
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AutoSizeText(
+                        text = formattedTime,
+                        style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                        maxTextSize = if (isLandscape) 60f else 100f,
+                        minTextSize = 24f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
             TimeDisplayMode.ANALOG -> {
-                if (isLandscape) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        AnalogClock(
-                            remainingTimeInSeconds = remainingTimeInSeconds,
-                            totalTimeInSeconds = totalTimeInSeconds,
-                            size = clockSize
-                        )
-                    }
-                } else {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        AnalogClock(
-                            remainingTimeInSeconds = remainingTimeInSeconds,
-                            totalTimeInSeconds = totalTimeInSeconds,
-                            size = clockSize
-                        )
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val availableWidth = this.maxWidth
+                    val availableHeight = this.maxHeight
+                    
+                    if (isLandscape) {
+                        val clockSize = min(availableWidth.value * 0.6f, availableHeight.value * 0.8f)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            AnalogClock(
+                                remainingTimeInSeconds = remainingTimeInSeconds,
+                                totalTimeInSeconds = totalTimeInSeconds,
+                                size = clockSize
+                            )
+                        }
+                    } else {
+                        val clockSize = min(availableWidth.value * 0.8f, availableHeight.value * 0.6f)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            AnalogClock(
+                                remainingTimeInSeconds = remainingTimeInSeconds,
+                                totalTimeInSeconds = totalTimeInSeconds,
+                                size = clockSize
+                            )
+                        }
                     }
                 }
             }
