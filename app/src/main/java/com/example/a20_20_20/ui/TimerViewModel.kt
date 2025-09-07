@@ -22,6 +22,9 @@ class TimerViewModel : ViewModel() {
     private val _showSettings = MutableStateFlow(false)
     val showSettings: StateFlow<Boolean> = _showSettings.asStateFlow()
     
+    private val _toastMessage = MutableStateFlow<String?>(null)
+    val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+    
     val notificationSettings: StateFlow<NotificationSettings> = application.notificationSettings
     val timerSettings: StateFlow<TimerSettings> = application.timerSettings
 
@@ -69,9 +72,29 @@ class TimerViewModel : ViewModel() {
     fun updateNotificationSettings(settings: NotificationSettings) {
         application.updateNotificationSettings(settings)
     }
+    
+    fun toggleKeepScreenOn() {
+        val currentSettings = notificationSettings.value
+        val newSettings = currentSettings.copy(
+            keepScreenOnDuringTimer = !currentSettings.keepScreenOnDuringTimer
+        )
+        application.updateNotificationSettings(newSettings)
+        
+        // トースト表示用メッセージを設定
+        val message = if (newSettings.keepScreenOnDuringTimer) {
+            "画面ロック無効"
+        } else {
+            "画面ロック有効"
+        }
+        _toastMessage.value = message
+    }
 
     fun navigateToSettings() {
         _showSettings.value = true
+    }
+    
+    fun clearToastMessage() {
+        _toastMessage.value = null
     }
 
     fun navigateBack() {

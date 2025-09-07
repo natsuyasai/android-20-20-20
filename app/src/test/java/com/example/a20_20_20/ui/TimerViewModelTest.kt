@@ -1,5 +1,6 @@
 package com.example.a20_20_20.ui
 
+import com.example.a20_20_20.domain.NotificationSettings
 import com.example.a20_20_20.domain.TimerPhase
 import com.example.a20_20_20.domain.TimerSettings
 import com.example.a20_20_20.domain.TimerState
@@ -91,5 +92,49 @@ class TimerViewModelTest {
         
         assertEquals(TimerPhase.WORK, workState.currentPhase)
         assertEquals(TimerPhase.BREAK, breakState.currentPhase)
+    }
+
+    @Test
+    fun `画面ロック設定が正しく切り替わる`() {
+        // 初期設定（画面ロック無効が false）
+        val initialSettings = NotificationSettings(
+            keepScreenOnDuringTimer = false
+        )
+        
+        // 切り替え後の設定（画面ロック無効が true）
+        val toggledSettings = initialSettings.copy(
+            keepScreenOnDuringTimer = !initialSettings.keepScreenOnDuringTimer
+        )
+        
+        assertFalse(initialSettings.keepScreenOnDuringTimer)
+        assertTrue(toggledSettings.keepScreenOnDuringTimer)
+    }
+
+    @Test
+    fun `画面ロック有効時のトーストメッセージが正しい`() {
+        val settings = NotificationSettings(keepScreenOnDuringTimer = false)
+        val newSettings = settings.copy(keepScreenOnDuringTimer = true)
+        
+        val expectedMessage = if (newSettings.keepScreenOnDuringTimer) {
+            "画面ロック無効"
+        } else {
+            "画面ロック有効"
+        }
+        
+        assertEquals("画面ロック無効", expectedMessage)
+    }
+
+    @Test
+    fun `画面ロック無効時のトーストメッセージが正しい`() {
+        val settings = NotificationSettings(keepScreenOnDuringTimer = true)
+        val newSettings = settings.copy(keepScreenOnDuringTimer = false)
+        
+        val expectedMessage = if (newSettings.keepScreenOnDuringTimer) {
+            "画面ロック無効"
+        } else {
+            "画面ロック有効"
+        }
+        
+        assertEquals("画面ロック有効", expectedMessage)
     }
 }

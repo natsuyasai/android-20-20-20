@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +26,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import android.widget.Toast
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +64,17 @@ fun TimerScreen(
     val showSettings by viewModel.showSettings.collectAsState()
     val notificationSettings by viewModel.notificationSettings.collectAsState()
     val timerSettings by viewModel.timerSettings.collectAsState()
+    val toastMessage by viewModel.toastMessage.collectAsState()
+    
+    val context = LocalContext.current
+    
+    // トースト表示処理
+    LaunchedEffect(toastMessage) {
+        toastMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.clearToastMessage()
+        }
+    }
     
     if (showSettings) {
         SettingsScreen(
@@ -96,6 +110,7 @@ fun TimerScreen(
             TimerContent(
                 modifier = Modifier.fillMaxSize(),
                 uiState = uiState,
+                viewModel = viewModel,
                 onStartClick = { viewModel.startTimer() },
                 onPauseClick = { viewModel.pauseTimer() },
                 onStopClick = { viewModel.stopTimer() },
@@ -471,6 +486,7 @@ fun NotificationPermissionBanner(
 fun TimerContent(
     modifier: Modifier = Modifier,
     uiState: TimerUiState,
+    viewModel: TimerViewModel,
     onStartClick: () -> Unit,
     onPauseClick: () -> Unit,
     onStopClick: () -> Unit,
@@ -508,12 +524,35 @@ fun TimerContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // 設定ボタン
-                IconButton(onClick = onSettingsClick) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "設定"
-                    )
+                // ボタンエリア（画面ロック切り替え＋設定）
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 画面ロック切り替えボタン
+                    val keepScreenOn by viewModel.notificationSettings.collectAsState()
+                    IconButton(onClick = { viewModel.toggleKeepScreenOn() }) {
+                        Icon(
+                            imageVector = if (keepScreenOn.keepScreenOnDuringTimer) {
+                                Icons.Default.Lock
+                            } else {
+                                Icons.Default.LockOpen
+                            },
+                            contentDescription = if (keepScreenOn.keepScreenOnDuringTimer) {
+                                "画面ロック無効"
+                            } else {
+                                "画面ロック有効"
+                            }
+                        )
+                    }
+                    
+                    // 設定ボタン
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "設定"
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -553,11 +592,29 @@ fun TimerContent(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 設定ボタン
+            // 設定ボタンとスクリーンロックボタン
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // 画面ロック切り替えボタン
+                val keepScreenOn by viewModel.notificationSettings.collectAsState()
+                IconButton(onClick = { viewModel.toggleKeepScreenOn() }) {
+                    Icon(
+                        imageVector = if (keepScreenOn.keepScreenOnDuringTimer) {
+                            Icons.Default.Lock
+                        } else {
+                            Icons.Default.LockOpen
+                        },
+                        contentDescription = if (keepScreenOn.keepScreenOnDuringTimer) {
+                            "画面ロック無効"
+                        } else {
+                            "画面ロック有効"
+                        }
+                    )
+                }
+                
                 IconButton(onClick = onSettingsClick) {
                     Icon(
                         imageVector = Icons.Default.Settings,
@@ -753,6 +810,7 @@ fun TimerScreenPreview() {
     _20_20_20Theme {
         TimerContent(
             uiState = TimerUiState(),
+            viewModel = viewModel(),
             onStartClick = {},
             onPauseClick = {},
             onStopClick = {},
@@ -816,6 +874,7 @@ fun TimerContentLandscapeDigitalPreview() {
     _20_20_20Theme {
         TimerContent(
             uiState = TimerUiState(),
+            viewModel = viewModel(),
             onStartClick = {},
             onPauseClick = {},
             onStopClick = {},
@@ -835,6 +894,7 @@ fun TimerContentLandscapeAnalogPreview() {
     _20_20_20Theme {
         TimerContent(
             uiState = TimerUiState(),
+            viewModel = viewModel(),
             onStartClick = {},
             onPauseClick = {},
             onStopClick = {},
