@@ -29,7 +29,8 @@ data class NotificationSettings(
     val soundVolume: Float = 1.0f, // 0.0f - 1.0f
     val soundPlaybackMode: SoundPlaybackMode = SoundPlaybackMode.NOTIFICATION, // 音声再生方式
     val priority: NotificationPriority = NotificationPriority.DEFAULT, // 通知の優先度
-    val updateInterval: NotificationUpdateInterval = NotificationUpdateInterval.EVERY_SECOND // 通知更新間隔
+    val updateInterval: NotificationUpdateInterval = NotificationUpdateInterval.EVERY_SECOND, // 通知更新間隔
+    val keepScreenOnDuringTimer: Boolean = false // カウントダウン中の画面自動ロック無効化
 ) {
     companion object {
         val DEFAULT = NotificationSettings()

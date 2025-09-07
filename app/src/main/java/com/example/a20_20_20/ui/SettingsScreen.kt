@@ -407,7 +407,8 @@ fun SettingsScreen(
                     soundVolume = soundVolume,
                     soundPlaybackMode = soundPlaybackMode,
                     priority = notificationPriority,
-                    updateInterval = updateInterval
+                    updateInterval = updateInterval,
+                    keepScreenOnDuringTimer = currentNotificationSettings.keepScreenOnDuringTimer
                 )
                 onSettingsChanged(newSettings)
                 onNotificationSettingsChanged(newNotificationSettings)

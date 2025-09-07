@@ -29,6 +29,9 @@ import androidx.core.content.ContextCompat
 import com.example.a20_20_20.service.TimerService
 import com.example.a20_20_20.ui.TimerScreen
 import com.example.a20_20_20.ui.theme._20_20_20Theme
+import com.example.a20_20_20.util.ScreenLockManager
+import com.example.a20_20_20.domain.TimerStatus
+import androidx.compose.runtime.LaunchedEffect
 
 class MainActivity : ComponentActivity() {
     
@@ -75,6 +78,21 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             _20_20_20Theme {
+                // 画面ロック制御の監視
+                LaunchedEffect(Unit) {
+                    val app = TimerApplication.getInstance()
+                    app.timerState.collect { timerState ->
+                        val notificationSettings = app.notificationSettings.value
+                        val isTimerRunning = timerState.status == TimerStatus.RUNNING
+                        
+                        ScreenLockManager.updateScreenLockSetting(
+                            activity = this@MainActivity,
+                            keepScreenOn = notificationSettings.keepScreenOnDuringTimer,
+                            isTimerRunning = isTimerRunning
+                        )
+                    }
+                }
+                
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     TimerScreen(
                         modifier = Modifier.padding(innerPadding),
